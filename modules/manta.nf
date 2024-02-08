@@ -8,7 +8,7 @@ process MANTA_CNV_CALL {
 		path(fasta)
 	output:
 		tuple val(sample), path("manta"), emit: manta_dir
-		tuple val(sample), path("manta/results/variants/diploidSV.vcf.gz"), emit: manta_vcf
+		tuple val(sample), path("manta/results/variants/diploidSV.vcf.gz"), emit: vcf
 	script:
 		"""
             
@@ -23,7 +23,7 @@ process MANTA_CNV_CALL {
 }
 
 process MANTA_FILTER_VCF {
-	publishDir "${params.outfolder}/${params.runID}/CNV", pattern: "${sample}", mode: 'copy', overwrite: true
+	publishDir "${params.outfolder}/${params.runID}/CNV", mode: 'copy', overwrite: true
 	tag "${sample}"
 	label 'gatk'
 	label 'mem_8GB'
@@ -31,7 +31,8 @@ process MANTA_FILTER_VCF {
 	input:
 		tuple val(sample), path(manta)
 	output:
-		tuple val(sample), path("${sample}_manta_cnv_sorted.vcf.gz"), path("${sample}_manta_cnv_sorted.vcf.gz.tbi")
+		tuple val(sample), path("${sample}_manta_cnv_sorted.vcf.gz"), emit: vcf
+		tuple val(sample), path("${sample}_manta_cnv_sorted.vcf.gz.tbi"), emit: tbi
 	script:
 		"""
             

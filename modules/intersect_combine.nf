@@ -5,7 +5,7 @@ process INTERSECT_PAIRED_END_CNV {
 	label 'mem_8GB'
 	label 'core_4'
 	input:
-		tuple val(sample), path(delly), path(manta)
+		tuple val(sample), path(delly), path(delly_tbi), path(manta), path(manta_tbi)
 	output:
 		tuple val(sample), path("${sample}_pairend.vcf.gz"), path("${sample}_pairend.vcf.gz.tbi")
 	script:
@@ -25,7 +25,7 @@ process INTERSECT_COVERAGE_CNV {
 	label 'mem_8GB'
 	label 'core_4'
 	input:
-		tuple val(sample), path(cnvpytor), path(erds)
+		tuple val(sample), path(cnvpytor), path(cnvpytor_tbi), path(erds), path(erds_tbi)
 	output:
 		tuple val(sample), path("${sample}_coverage.vcf.gz"), path("${sample}_coverage.vcf.gz.tbi")
 	script:

@@ -14,8 +14,6 @@ process DEEP_VARIANT {
         /opt/deepvariant/bin/run_deepvariant \
         --model_type=WGS \
         --ref=${fasta}/${fasta}.fa \
-		--haploid_contigs="${params.haploid_contigs}" \
-		--par_regions_bed=${params.par_regions_bed} \
         --reads=${bam} \
         --output_vcf=${sample}_deepvariant.vcf.gz \
         --num_shards=${task.cpus} 
@@ -24,22 +22,23 @@ process DEEP_VARIANT {
 
 }
 
-process FILTER_SNVS {
-    publishDir "${params.outfolder}/${params.runID}/SNV/", pattern: "${sample}_deepvariant_filtered", mode: 'copy', overwrite: true
+process FILTER_AND_MERGE_SNVS {
+    publishDir "${params.outfolder}/${params.runID}/SNV/", mode: 'copy', overwrite: true
     tag "${sample}"
     label 'gatk'
 	label 'mem_16GB'
-	label 'core_1'
+	label 'core_8'
 	input:
 		tuple val(sample), path(vcf)
 		path(fasta)
 	output:
-		tuple val(sample), path("${sample}_deepvariant_filtered.vcf.gz"), path("${sample}_deepvariant_filtered.vcf.gz.tbi")
+		tuple val(sample), path("${sample}_deepvariant_filtered.vcf.gz"), emit: vcf 
+		tuple val(sample), path("${sample}_deepvariant_filtered.vcf.gz.tbi"), emit: tbi
 	script:
 		"""
 
-		bcftools sort ${vcf} -Ov | \
-		bcftools view -f PASS --threads ${task.cpus} -Oz -o ${sample}_deepvariant_filtered.vcf.gz
+		bcftools sort ${vcf} -Ou | \
+		bcftools view -f PASS -Oz -o ${sample}_deepvariant_filtered.vcf.gz
 
 		tabix -p vcf ${sample}_deepvariant_filtered.vcf.gz
 

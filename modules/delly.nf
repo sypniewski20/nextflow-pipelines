@@ -11,6 +11,8 @@ process DELLY_CNV_CALL {
 	script:
 		"""
 
+		export OMP_NUM_THREADS=${task.cpus}
+
         delly call -g ${fasta}/${fasta}.fa ${bam} > ${sample}_delly.vcf
 
 		"""
@@ -25,7 +27,8 @@ process DELLY_FILTER_VCF {
 	input:
 		tuple val(sample), path(delly)
 	output:
-		tuple val(sample), path("${sample}_delly_cnv_sorted.vcf.gz"), path("${sample}_delly_cnv_sorted.vcf.gz.tbi")
+		tuple val(sample), path("${sample}_delly_cnv_sorted.vcf.gz"), emit: vcf
+		tuple val(sample), path("${sample}_delly_cnv_sorted.vcf.gz.tbi"), emit: tbi
 	script:
 		"""
             

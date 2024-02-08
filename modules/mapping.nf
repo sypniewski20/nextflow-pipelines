@@ -1,3 +1,49 @@
+// process BWA_MAP_READS {
+// 	tag "${sample}"
+// 	label 'gatk'
+// 	label 'mem_64GB'
+// 	label 'core_36'
+// 	input:
+// 		tuple val(sample), path(read_1), path(read_2)
+//         path(fasta)
+// 	output:
+// 		tuple val(sample), path("${sample}_pre.bam"), path("${sample}_pre.bam.bai")
+// 	script:
+// 		"""
+
+// 		READ_GROUP_NAME=\$( zgrep @ ${read_1} | \
+// 					head -n 1 | \
+// 					cut -d :  -f1 | \
+// 					sed 's/@//g' )
+
+// 		bwa mem -t ${task.cpus} \
+// 			${fasta}/${fasta}.fa \
+// 			${read_1} \
+// 			${read_2} | \
+// 		samtools view --reference ${fasta}/${fasta}.fa \
+// 					  --threads ${task.cpus} \
+// 					  --bam | \
+// 		samtools sort -@ ${task.cpus} \
+// 					  -O bam \
+// 					  -o /dev/stdout | \
+// 		gatk AddOrReplaceReadGroups \
+// 					  -I /dev/stdin \
+// 					  -O  ${sample}_pre.bam \
+// 					  -RGID \$READ_GROUP_NAME \
+// 					  -RGLB lib1 \
+// 					  -RGPL ILLUMINA \
+// 					  -RGPU unit1 \
+// 					  -RGSM ${sample} \
+// 					  --CREATE_INDEX true
+
+// 		samtools index -@ ${task.cpus} ${sample}_pre.bam
+
+// 		gatk ValidateSamFile -I  ${sample}_pre.bam -R ${fasta}/${fasta}.fa
+
+
+// 		"""
+// }
+
 process BWA_MAP_READS {
 	tag "${sample}"
 	label 'gatk'
@@ -11,8 +57,15 @@ process BWA_MAP_READS {
 	script:
 		"""
 
+		READ_GROUP_NAME=\$( zgrep @ ${read_1} | \
+					head -n 1 | \
+					cut -d :  -f1 | \
+					sed 's/@//g' )
+
+		tags=\$(echo "@RG\\tID:\${READ_GROUP_NAME}\\tSM:${sample}\\tPL:ILLUMINA\\tLB:lb1")
+
 		bwa mem -t ${task.cpus} \
-			-R "@RG\\tID:${sample}\\tSM:${sample}\\tPL:Illumina" \
+			-R \${tags} \
 			${fasta}/${fasta}.fa \
 			${read_1} \
 			${read_2} | \
@@ -25,8 +78,13 @@ process BWA_MAP_READS {
 
 		samtools index -@ ${task.cpus} ${sample}_pre.bam
 
+		gatk ValidateSamFile -I  ${sample}_pre.bam \
+							 -MODE	SUMMARY
+
+
 		"""
 }
+
 
 process BASE_RECALIBRATOR {
 	publishDir "${params.outfolder}/${params.runID}/BAM", mode: 'symlink', overwrite: true
@@ -71,20 +129,24 @@ process APPLY_BQSR {
 	label 'core_8'
 	input:
 		tuple val(sample), path(bam), path(recal_table)
-		path(fasta)
 		path(interval_list)
+		path(fasta)
 	output:
 		tuple val(sample), path("${sample}_recal.bam"), path("${sample}_recal.bam.bai")
 	script:
 		"""
 		gatk ApplyBQSR \
 		-R ${fasta}/${fasta}.fa \
-		-I ${bam} \
 		-L ${interval_list} \
+		-I ${bam} \
 		--bqsr-recal-file ${recal_table} \
 		-O ${sample}_recal.bam
 
 		samtools index -@ ${task.cpus} ${sample}_recal.bam
+
+		gatk ValidateSamFile -I ${sample}_recal.bam \
+							 -M SUMMARY
+
 		"""
 }
 
@@ -103,7 +165,7 @@ process GATK_MARK_DUPLICATES {
 		path("${sample}.txt"), emit: sample_checkpoint
 	script:
 		"""
-       gatk MarkDuplicates \
+       	gatk MarkDuplicates \
             -I ${bam} \
             -O ${sample}_recal_dupfiltered.bam \
             -M ${sample}.dup_metrics.txt \
@@ -124,8 +186,8 @@ process SAMBAMBA_MARK_DUPLICATES {
 	publishDir "${params.outfolder}/${params.runID}/BAM", pattern: "${sample}_recal_dupfiltered.*", mode: 'copy', overwrite: true
 	tag "${sample}"
 	label 'gatk'
-	label 'mem_32GB'
-	label 'core_16'
+	label 'mem_16GB'
+	label 'core_8'
 	input:
 		tuple val(sample), path(bam), path(bai)
 	output:
@@ -135,7 +197,6 @@ process SAMBAMBA_MARK_DUPLICATES {
 		"""
 
 		sambamba markdup \
-			-p \
 			--nthreads ${task.cpus} \
 			${bam} \
 			${sample}_recal_dupfiltered.bam
@@ -147,6 +208,11 @@ process SAMBAMBA_MARK_DUPLICATES {
 			exit 1
 		fi
 
+		gatk ValidateSamFile -I ${sample}_recal_dupfiltered.bam \
+							 -M SUMMARY
+
 		echo -e "${sample}\\t${params.outfolder}/${params.runID}/BAM/${sample}_recal_dupfiltered.bam\\t${params.outfolder}/${params.runID}/BAM/${sample}_recal_dupfiltered.bam.bai" > ${sample}.txt
+		
 		"""
 }
+

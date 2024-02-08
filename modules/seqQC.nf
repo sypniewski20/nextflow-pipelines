@@ -1,12 +1,12 @@
 process CHECK_INTEGRITY {
 	label 'gatk'
 	tag "${sample}"
-	label 'mem_2GB'
+	label 'mem_16GB'
 	label 'core_8'
 	input:
 		tuple val(sample),  file(read_1), file(read_2)
 	output:
-		tuple val(sample),  file(read_1), file(read_2)
+		tuple val(sample),  file("${read_1}"), file("${read_2}")
 	script:
 	"""
 

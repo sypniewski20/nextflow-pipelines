@@ -23,13 +23,14 @@ include { Read_samplesheet; Read_bam_checkpoint } from './modules/functions.nf'
 include { CHECK_INTEGRITY; FASTQC_PROCESSING; FASTP_PROCESSING; MOSDEPTH_WGS} from './modules/seqQC.nf'
 include { BWA_MAP_READS; BASE_RECALIBRATOR; APPLY_BQSR; SAMBAMBA_MARK_DUPLICATES } from './modules/mapping.nf'
 include { BQSR_SPARK } from './modules/spark_workflows.nf'
-include { DEEP_VARIANT; FILTER_SNVS } from "./modules/deepvariant.nf"
+include { DEEP_VARIANT; FILTER_AND_MERGE_SNVS } from "./modules/deepvariant.nf"
 include { DELLY_CNV_CALL; DELLY_FILTER_VCF } from "./modules/delly.nf"
 include { MANTA_CNV_CALL; MANTA_FILTER_VCF } from "./modules/manta.nf"
-include { ERDS_CNV_CALL } from "./modules/erds.nf"
+include { ERDS_CNV_CALL; ERDS_FILTER_VCF } from "./modules/erds.nf"
 include { CNVPYTOR_CALL; CNVPYTOR_FILTER_VCF } from "./modules/CNVpytor.nf"
 include { WRITE_BAM_CHECKPOINT } from './modules/checkpoint.nf'
 include { INTERSECT_PAIRED_END_CNV; INTERSECT_COVERAGE_CNV } from './modules/intersect_combine.nf'
+include { SV2_REGENOTYPE } from './modules/sv2.nf'
 
 
 workflow preprocessing_workflow {
@@ -67,7 +68,7 @@ workflow mapping_workflow {
 	main:
 		BWA_MAP_READS(ch_fastp_results, fasta)		
 		BASE_RECALIBRATOR(BWA_MAP_READS.out, fasta, interval_list, snv_resource, cnv_resource, sv_resource)
-		APPLY_BQSR(BASE_RECALIBRATOR.out, fasta, interval_list)
+		APPLY_BQSR(BASE_RECALIBRATOR.out, interval_list, fasta)
 		SAMBAMBA_MARK_DUPLICATES(APPLY_BQSR.out)
 		SAMBAMBA_MARK_DUPLICATES.out.ch_bam | set { ch_bam_filtered }
 		WRITE_BAM_CHECKPOINT(SAMBAMBA_MARK_DUPLICATES.out.sample_checkpoint.collect())
@@ -93,8 +94,9 @@ workflow snv_call {
 		fasta
 	main:
 		DEEP_VARIANT(ch_samples_checkpoint, fasta)
-		FILTER_SNVS(DEEP_VARIANT.out, fasta)
-		FILTER_SNVS.out | set { ch_snv_call }
+		DEEP_VARIANT.out | set { snv_merge }
+		FILTER_AND_MERGE_SNVS(snv_merge, fasta)
+		FILTER_AND_MERGE_SNVS.out.vcf | set { ch_snv_call }
 	emit:
 		ch_snv_call
 }
@@ -105,15 +107,14 @@ workflow paired_end_cnv_call {
 		fasta
 	main:
 		DELLY_CNV_CALL(ch_samples_checkpoint, fasta)
-		MANTA_CNV_CALL(ch_samples_checkpoint, fasta)
 		DELLY_FILTER_VCF(DELLY_CNV_CALL.out)
-		MANTA_FILTER_VCF(MANTA_CNV_CALL.out.manta_vcf)
-		DELLY_FILTER_VCF.out
-			.join(MANTA_FILTER_VCF.out)
-			.set{ intersect_input }
-		INTERSECT_PAIRED_END_CNV( intersect_input ) | set { ch_intersect_paired }
+		DELLY_FILTER_VCF.out.vcf | set { delly_output }
+		MANTA_CNV_CALL(ch_samples_checkpoint, fasta)
+		MANTA_FILTER_VCF(MANTA_CNV_CALL.out.vcf)
+		MANTA_FILTER_VCF.out.vcf | set { manta_output }
 	emit:
-		ch_intersect_paired
+		delly_output
+		manta_output
 }
 
 workflow coverage_based_cnv_call {
@@ -124,31 +125,37 @@ workflow coverage_based_cnv_call {
 	main:
 		CNVPYTOR_CALL(ch_samples_checkpoint)
 		CNVPYTOR_FILTER_VCF(CNVPYTOR_CALL.out)
+		CNVPYTOR_FILTER_VCF.out.vcf | set { cnvpytor_output }
 		ch_samples_checkpoint
 			.join(ch_snv_call)
-			.set{ erds_input }
+			.set{erds_input}
 		ERDS_CNV_CALL(erds_input, fasta)
-		CNVPYTOR_FILTER_VCF.out
-			.join(ERDS_CNV_CALL.out)
-			.set{ intersect_input }
-		INTERSECT_COVERAGE_CNV(intersect_input) | set { ch_intersect_coverage }
+		ERDS_FILTER_VCF(ERDS_CNV_CALL.out)
+		ERDS_FILTER_VCF.out.vcf | set { erds_output }
 	emit:
-		ch_intersect_coverage
+		cnvpytor_output
+		erds_output
 }
 
 workflow joint_cnv_regenotyping {
 	take:
-		ch_intersect_paired
-		ch_intersect_coverage
+		ch_samples_checkpoint
+		delly_output
+		manta_output
+		cnvpytor_output
+		erds_output
+		ch_snv_call
+		ped_file
+		fasta
 	main:
-		ch_intersect_paired
-			.join(ch_intersect_coverage)
-			.collect()
-			.set{ combine_input }
-		COMBINE_CNV(combine_input)
-		SV2(COMBINE_CNV.out)
-	emit:
-		ch_cnv_regenotyped
+		delly_output
+			.join(manta_output)
+			.join(cnvpytor_output)
+			.join(erds_output)
+			.set{ cnv_input }
+		SV2_REGENOTYPE(ch_samples_checkpoint, cnv_input, ch_snv_call, ped_file, fasta)
+	// emit:
+	// 	ch_cnv_regenotyped
 }
 
 //Main workflow
@@ -168,15 +175,21 @@ workflow {
 	} else {
 		bam_checkpoint(params.bam_samplesheet) | set { bam_input }
 	}
-		snv_call( bam_input, 
+		snv_call(bam_input, 
 				 params.fasta)
 		paired_end_cnv_call(bam_input, 
 							params.fasta)
-		// coverage_based_cnv_call(bam_input, 
-		// 						params.fasta, 
-		// 						snv_call.out)
-		// joint_cnv_regenotyping(paired_end_cnv_call.out,
-		// 					   coverage_based_cnv_call.out)
+		coverage_based_cnv_call(bam_input, 
+								params.fasta, 
+								snv_call.out)
+		joint_cnv_regenotyping(bam_input,
+							   paired_end_cnv_call.out.delly_output,
+							   paired_end_cnv_call.out.manta_output,
+							   coverage_based_cnv_call.out.cnvpytor_output,
+							   coverage_based_cnv_call.out.erds_output,
+							   snv_call.out,
+							   params.ped_file,
+							   params.fasta)
 }
 
 workflow.onComplete {
