@@ -4,10 +4,10 @@ process FASTQ_TO_SAM {
 	label 'mem_96GB'
 	label 'core_36'
 	input:
-		tuple val(sample), val(is_germline), path(read_1), path(read_2)
+		tuple val(sample), path(read_1), path(read_2)
 		path(fasta)
 	output:
-		tuple val(sample), val(is_germline), path("${sample}_unmapped.bam"), path("${sample}_unmapped.bam.bai"), emit: ubam
+		tuple val(sample), path("${sample}_unmapped.bam"), path("${sample}_unmapped.bam.bai")
 	script:
 		"""
 
@@ -50,10 +50,10 @@ process BWA_SPARK_MAP_READS {
 	label 'core_64'
 	input:
 		tuple val(sample), path(bam), path(bai)
-		path(interval_list)
         path(fasta)
+		path(interval_list)
 	output:
-		tuple val(sample), val(is_germline), path("${sample}_pre_sorted.bam"), path("${sample}_pre_sorted.bam.bai"), path("${sample}_pre_sorted.bam.sbi"), emit: bam
+		tuple val(sample), path("${sample}_pre_sorted.bam"), path("${sample}_pre_sorted.bam.bai"), path("${sample}_pre_sorted.bam.sbi"), emit: bam
 	script:
 		"""
 
@@ -158,6 +158,7 @@ process MARK_DUPLICATES_SPARK {
             -I ${bam} \
             -O ${sample}_recal_dupfiltered.bam \
             -M ${sample}.dup_metrics.txt \
+			-L ${interval_list} \
             --conf 'spark.executor.cores=${task.cpus}'
 
 		gatk ValidateSamFile \

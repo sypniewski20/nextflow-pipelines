@@ -44,3 +44,23 @@ process ERDS_FILTER_VCF {
 		"""
 }
 
+process ERDS_FILTER_AND_MERGE_VCF {
+	publishDir "${params.outfolder}/${params.runID}/CNV", mode: 'copy', overwrite: true
+	tag "${sample}"
+	label 'gatk'	
+	label 'mem_8GB'
+	label 'core_4'
+	input:
+		path(vcf)
+	output:
+		tuple path("multisample_erds_sorted.vcf.gz"), path("multisample_erds_sorted.vcf.gz.tbi")
+	script:
+		"""
+        
+		bcftools merge ${vcf} -Ou -o | \
+		bcftools sort -Ou | \
+		bcftools view -f PASS --threads ${task.cpus} -Oz -o multisample_erds_sorted.vcf.gz
+
+		tabix -p vcf multisample_erds_sorted.vcf.gz
+		"""
+}

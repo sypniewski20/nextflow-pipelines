@@ -6,7 +6,8 @@ process CNVPYTOR_CALL {
 	input:
 		tuple val(sample), path(bam), path(bai)
 	output:
-		tuple val(sample),  path("${sample}.vcf"), emit: vcf
+		tuple val(sample), path("${sample}.vcf"), emit: vcf
+		tuple val(sample), path("${sample}.pytor"), emit: pytor
 	script:
 		"""
 
@@ -48,3 +49,47 @@ process CNVPYTOR_FILTER_VCF {
 }
 
 
+process CNVPYTOR_MERGE_CALLS {
+	tag "${sample}"
+	label 'cnvpytor'
+	label 'mem_16GB'
+	label 'core_36'
+	input:
+		path(pytor)
+	output:
+		path("multisample.vcf")
+	script:
+		"""
+
+		#!/usr/bin/python3
+
+		import cnvpytor,os
+
+		view = cnvpytor.Viewer(["${pytor}"], params={} )
+		view.Q0_range = [0, 0.5]
+		view.size_range = int([100000, 'inf'])
+		view.print_filename = "multisample.vcf"
+		view.print_calls_file()
+
+		"""
+}
+
+process CNVPYTOR_FILTER_MERGED {
+	publishDir "${params.outfolder}/${params.runID}/CNV", mode: 'copy', overwrite: true
+	label 'gatk'
+	label 'mem_16GB'
+	label 'core_36'
+	input:
+		path(vcf)
+	output:
+		tuple path("multisample_cnvpytor_sorted.vcf.gz"), path("multisample_cnvpytor_sorted.vcf.gz.tbi")
+	script:
+		"""
+		
+		bcftools sort ${vcf} -Ou | \
+		bcftools view --threads ${task.cpus} -f PASS -Oz -o multisample_cnvpytor_sorted.vcf.gz
+
+		tabix -p vcf multisample_cnvpytor_sorted.vcf.gz
+
+		"""
+}

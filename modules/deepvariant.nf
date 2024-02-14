@@ -16,13 +16,15 @@ process DEEP_VARIANT {
         --ref=${fasta}/${fasta}.fa \
         --reads=${bam} \
         --output_vcf=${sample}_deepvariant.vcf.gz \
-        --num_shards=${task.cpus} 
+        --num_shards=${task.cpus} \
+		--parse_sam_aux_fields \
+		--use_original_quality_scores
 
 		"""
 
 }
 
-process FILTER_AND_MERGE_SNVS {
+process FILTER_SNVS {
     publishDir "${params.outfolder}/${params.runID}/SNV/", mode: 'copy', overwrite: true
     tag "${sample}"
     label 'gatk'
@@ -32,7 +34,7 @@ process FILTER_AND_MERGE_SNVS {
 		tuple val(sample), path(vcf)
 		path(fasta)
 	output:
-		tuple val(sample), path("${sample}_deepvariant_filtered.vcf.gz"), path("${sample}_deepvariant_filtered.vcf.gz.tbi"), emit: vcf 
+		tuple val(sample), path("${sample}_deepvariant_filtered.vcf.gz"), path("${sample}_deepvariant_filtered.vcf.gz.tbi")
 	script:
 		"""
 
@@ -40,6 +42,29 @@ process FILTER_AND_MERGE_SNVS {
 		bcftools view -f PASS -Oz -o ${sample}_deepvariant_filtered.vcf.gz
 
 		tabix -p vcf ${sample}_deepvariant_filtered.vcf.gz
+
+		"""
+
+}
+
+process FILTER_AND_MERGE_SNVS {
+    publishDir "${params.outfolder}/${params.runID}/SNV/", mode: 'copy', overwrite: true
+    label 'gatk'
+	label 'mem_256GB'
+	label 'core_36'
+	input:
+		path(vcf)
+		path(fasta)
+	output:
+		tuple path("multisample_deepvariant_filtered.vcf.gz"), path("multisample_deepvariant_filtered.vcf.gz.tbi")
+	script:
+		"""
+
+		glnexus_cli --config DeepVariant ${vcf} | \
+		bcftools sort -Ou -m ${task.memory}
+		bcftools view --threads ${task.cpus} -f PASS -Oz -o multisample_deepvariant_filtered.vcf.gz
+
+		tabix -p vcf multisample_deepvariant_filtered.vcf.gz
 
 		"""
 
