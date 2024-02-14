@@ -27,8 +27,7 @@ process DELLY_FILTER_VCF {
 	input:
 		tuple val(sample), path(delly)
 	output:
-		tuple val(sample), path("${sample}_delly_cnv_sorted.vcf.gz"), emit: vcf
-		tuple val(sample), path("${sample}_delly_cnv_sorted.vcf.gz.tbi"), emit: tbi
+		tuple val(sample), path("${sample}_delly_cnv_sorted.vcf.gz"), path("${sample}_delly_cnv_sorted.vcf.gz.tbi")
 	script:
 		"""
             

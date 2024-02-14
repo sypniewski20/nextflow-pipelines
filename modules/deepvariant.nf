@@ -32,8 +32,7 @@ process FILTER_AND_MERGE_SNVS {
 		tuple val(sample), path(vcf)
 		path(fasta)
 	output:
-		tuple val(sample), path("${sample}_deepvariant_filtered.vcf.gz"), emit: vcf 
-		tuple val(sample), path("${sample}_deepvariant_filtered.vcf.gz.tbi"), emit: tbi
+		tuple val(sample), path("${sample}_deepvariant_filtered.vcf.gz"), path("${sample}_deepvariant_filtered.vcf.gz.tbi"), emit: vcf 
 	script:
 		"""
 

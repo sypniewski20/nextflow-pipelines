@@ -30,7 +30,7 @@ include { ERDS_CNV_CALL; ERDS_FILTER_VCF } from "./modules/erds.nf"
 include { CNVPYTOR_CALL; CNVPYTOR_FILTER_VCF } from "./modules/CNVpytor.nf"
 include { WRITE_BAM_CHECKPOINT } from './modules/checkpoint.nf'
 include { INTERSECT_PAIRED_END_CNV; INTERSECT_COVERAGE_CNV } from './modules/intersect_combine.nf'
-include { SV2_REGENOTYPE } from './modules/sv2.nf'
+include { SV2_REGENOTYPE; SV2_FILTER_VCF } from './modules/sv2.nf'
 
 
 workflow preprocessing_workflow {
@@ -96,7 +96,7 @@ workflow snv_call {
 		DEEP_VARIANT(ch_samples_checkpoint, fasta)
 		DEEP_VARIANT.out | set { snv_merge }
 		FILTER_AND_MERGE_SNVS(snv_merge, fasta)
-		FILTER_AND_MERGE_SNVS.out.vcf | set { ch_snv_call }
+		FILTER_AND_MERGE_SNVS.out | set { ch_snv_call }
 	emit:
 		ch_snv_call
 }
@@ -108,10 +108,10 @@ workflow paired_end_cnv_call {
 	main:
 		DELLY_CNV_CALL(ch_samples_checkpoint, fasta)
 		DELLY_FILTER_VCF(DELLY_CNV_CALL.out)
-		DELLY_FILTER_VCF.out.vcf | set { delly_output }
+		DELLY_FILTER_VCF.out | set { delly_output }
 		MANTA_CNV_CALL(ch_samples_checkpoint, fasta)
-		MANTA_FILTER_VCF(MANTA_CNV_CALL.out.vcf)
-		MANTA_FILTER_VCF.out.vcf | set { manta_output }
+		MANTA_FILTER_VCF(MANTA_CNV_CALL.out)
+		MANTA_FILTER_VCF.out | set { manta_output }
 	emit:
 		delly_output
 		manta_output
@@ -125,13 +125,13 @@ workflow coverage_based_cnv_call {
 	main:
 		CNVPYTOR_CALL(ch_samples_checkpoint)
 		CNVPYTOR_FILTER_VCF(CNVPYTOR_CALL.out)
-		CNVPYTOR_FILTER_VCF.out.vcf | set { cnvpytor_output }
+		CNVPYTOR_FILTER_VCF.out | set { cnvpytor_output }
 		ch_samples_checkpoint
 			.join(ch_snv_call)
 			.set{erds_input}
 		ERDS_CNV_CALL(erds_input, fasta)
 		ERDS_FILTER_VCF(ERDS_CNV_CALL.out)
-		ERDS_FILTER_VCF.out.vcf | set { erds_output }
+		ERDS_FILTER_VCF.out | set { erds_output }
 	emit:
 		cnvpytor_output
 		erds_output
@@ -148,14 +148,14 @@ workflow joint_cnv_regenotyping {
 		ped_file
 		fasta
 	main:
-		delly_output
-			.join(manta_output)
-			.join(cnvpytor_output)
-			.join(erds_output)
-			.set{ cnv_input }
-		SV2_REGENOTYPE(ch_samples_checkpoint, cnv_input, ch_snv_call, ped_file, fasta)
-	// emit:
-	// 	ch_cnv_regenotyped
+		SV2_REGENOTYPE(ch_samples_checkpoint,
+					   delly_output, 
+					   manta_output,
+					   cnvpytor_output,
+					   erds_output,
+					   ch_snv_call, ped_file, fasta)
+		SV2_FILTER_VCF(SV2_REGENOTYPE.out)
+
 }
 
 //Main workflow

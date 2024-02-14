@@ -1,11 +1,10 @@
 process ERDS_CNV_CALL {
-	publishDir "${params.outfolder}/${params.runID}/CNV/", mode: 'copy', overwrite: true
 	tag "${sample}"
 	label 'erds'
 	label 'mem_16GB'
 	label 'core_16'
 	input:
-		tuple val(sample), path(bam), path(bai), path(snv_calls)
+		tuple val(sample), path(bam), path(bai), path(snv_calls), path(snv_tbi)
 		path(fasta)
 	output:
 		tuple val(sample), path("${sample}.erds.vcf")
@@ -30,12 +29,15 @@ process ERDS_FILTER_VCF {
 	input:
 		tuple val(sample), path(vcf)
 	output:
-		tuple val(sample), path("${sample}_erds_sorted.vcf.gz"), emit: vcf
-		tuple val(sample), path("${sample}_erds_sorted.vcf.gz.tbi"), emit: tbi
+		tuple val(sample), path("${sample}_erds_sorted.vcf.gz"), path("${sample}_erds_sorted.vcf.gz.tbi")
 	script:
 		"""
-            
-		bcftools sort ${vcf} -Ov | \
+        				
+		bgzip -@ ${task.cpus} ${vcf}
+
+		tabix -p vcf ${vcf}.gz
+
+		bcftools sort ${vcf}.gz -Ov | \
 		bcftools view -f PASS --threads ${task.cpus} -Oz -o ${sample}_erds_sorted.vcf.gz
 
 		tabix -p vcf ${sample}_erds_sorted.vcf.gz

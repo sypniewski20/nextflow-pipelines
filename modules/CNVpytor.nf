@@ -36,8 +36,7 @@ process CNVPYTOR_FILTER_VCF {
 	input:
 		tuple val(sample), path(vcf)
 	output:
-		tuple val(sample), path("${sample}_cnvpytor_sorted.vcf.gz"), emit: vcf
-		tuple val(sample), path("${sample}_cnvpytor_sorted.vcf.gz.tbi"), emit: tbi
+		tuple val(sample), path("${sample}_cnvpytor_sorted.vcf.gz"), path("${sample}_cnvpytor_sorted.vcf.gz.tbi")
 	script:
 		"""
             

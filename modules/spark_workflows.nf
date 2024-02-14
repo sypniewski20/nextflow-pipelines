@@ -1,6 +1,6 @@
 process FASTQ_TO_SAM {
 	tag "${sample}"
-	label 'wgs_tools'
+	label 'gatk'
 	label 'mem_96GB'
 	label 'core_36'
 	input:
@@ -45,11 +45,11 @@ process FASTQ_TO_SAM {
 }
 process BWA_SPARK_MAP_READS {
 	tag "${sample}"
-	label 'wgs_tools'
-	label 'mem_128GB'
-	label 'core_36'
+	label 'gatk'
+	label 'mem_256GB'
+	label 'core_64'
 	input:
-		tuple val(sample), val(is_germline), path(bam), path(bai)
+		tuple val(sample), path(bam), path(bai)
 		path(interval_list)
         path(fasta)
 	output:
@@ -71,8 +71,12 @@ process BWA_SPARK_MAP_READS {
 		fi
 
 		sambamba sort --nthreads ${task.cpus} --memory-limit ${task.memory} \
-		-o ${sample}_pre \
+		-o ${sample}_pre_sorted \
 		${sample}_temp.bam
+
+		gatk ValidateSamFile \
+			-I ${sample}_pre_sorted.bam \
+			-MODE SUMMARY
 
 		gatk CreateHadoopBamSplittingIndex \
 			--tmp-dir ${params.spark_tmp} \
@@ -86,8 +90,8 @@ process BWA_SPARK_MAP_READS {
 process BQSR_SPARK  {
 	tag "${sample}"
 	label 'gatk'
-	label 'mem_96GB'
-	label 'core_36'
+	label 'mem_256GB'
+	label 'core_64'
 	input:
 		tuple val(sample), path(bam), path(bai)
 		path(fasta)
@@ -120,6 +124,10 @@ process BQSR_SPARK  {
 		--known-sites ${sv_resource} \
 		-O ${sample}_recal.bam
 
+		gatk ValidateSamFile \
+			-I ${sample}_recal.bam \
+			-MODE SUMMARY
+
 		if \$( samtools flagstat ${sample}_recal.bam | grep -q "^0 + 0 in total (QC-passed reads + QC-failed reads)\$" ); then
         	echo "${sample}_recal.bam is empty"
 			exit 1
@@ -131,17 +139,17 @@ process BQSR_SPARK  {
 }
 
 process MARK_DUPLICATES_SPARK {
-	publishDir "${params.outfolder}/${params.date}/BAMQC", pattern: "${sample}.dup_metrics.*", mode: 'copy', overwrite: true
-	publishDir "${params.outfolder}/${params.date}/BAM", pattern: "${sample}_recal_dupfiltered.bam*", mode: 'copy', overwrite: true
+	publishDir "${params.outfolder}/${params.runID}/BAMQC", pattern: "${sample}.dup_metrics.*", mode: 'copy', overwrite: true
+	publishDir "${params.outfolder}/${params.runID}/BAM", pattern: "${sample}_recal_dupfiltered.bam*", mode: 'copy', overwrite: true
 	tag "${sample}"
-	label 'wgs_tools'
-	label 'mem_96GB'
-	label 'core_36'
+	label 'gatk'
+	label 'mem_256GB'
+	label 'core_64'
 	input:
-		tuple val(sample), val(is_germline), path(bam), path(bai), path(sbi)
+		tuple val(sample), path(bam), path(bai)
 		path(interval_list)
 	output:
-		tuple val(sample), val(is_germline),  path("${sample}_recal_dupfiltered.bam"), path("${sample}_recal_dupfiltered.bam.bai"), emit: ch_bam
+		tuple val(sample),  path("${sample}_recal_dupfiltered.bam"), path("${sample}_recal_dupfiltered.bam.bai"), emit: ch_bam
 		path("${sample}.txt"), emit: sample_checkpoint
 	script:
 		"""
@@ -151,7 +159,11 @@ process MARK_DUPLICATES_SPARK {
             -O ${sample}_recal_dupfiltered.bam \
             -M ${sample}.dup_metrics.txt \
             --conf 'spark.executor.cores=${task.cpus}'
-		
+
+		gatk ValidateSamFile \
+			-I ${sample}_recal_dupfiltered.bam \
+			-MODE SUMMARY
+
 		if \$( samtools flagstat ${sample}_recal_dupfiltered.bam | grep -q "^0 + 0 in total (QC-passed reads + QC-failed reads)\$" ); then
         	echo "${sample}_recal_dupfiltered.bam is empty"
 			exit 1
@@ -162,6 +174,6 @@ process MARK_DUPLICATES_SPARK {
 			-O ${sample}_recal_dupfiltered.bam.sbi \
 			--create-bai
 
-		echo -e "${sample}\\t${is_germline}\\t${params.outfolder}/${params.date}/BAM/${sample}_recal_dupfiltered.bam\\t${params.outfolder}/${params.date}/BAM/${sample}_recal_dupfiltered.bam.bai" > ${sample}.txt
+		echo -e "${sample}\\t${params.outfolder}/${params.runID}/BAM/${sample}_recal_dupfiltered.bam\\t${params.outfolder}/${params.runID}/BAM/${sample}_recal_dupfiltered.bam.bai" > ${sample}.txt
 		"""
 }

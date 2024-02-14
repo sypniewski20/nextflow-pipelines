@@ -7,8 +7,7 @@ process MANTA_CNV_CALL {
 		tuple val(sample), path(bam), path(bai)
 		path(fasta)
 	output:
-		tuple val(sample), path("manta"), emit: manta_dir
-		tuple val(sample), path("manta/results/variants/diploidSV.vcf.gz"), emit: vcf
+		tuple val(sample), path("manta/results/variants/diploidSV.vcf.gz")
 	script:
 		"""
             
@@ -31,8 +30,7 @@ process MANTA_FILTER_VCF {
 	input:
 		tuple val(sample), path(manta)
 	output:
-		tuple val(sample), path("${sample}_manta_cnv_sorted.vcf.gz"), emit: vcf
-		tuple val(sample), path("${sample}_manta_cnv_sorted.vcf.gz.tbi"), emit: tbi
+		tuple val(sample), path("${sample}_manta_cnv_sorted.vcf.gz"), path("${sample}_manta_cnv_sorted.vcf.gz.tbi")
 	script:
 		"""
             

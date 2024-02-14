@@ -1,49 +1,3 @@
-// process BWA_MAP_READS {
-// 	tag "${sample}"
-// 	label 'gatk'
-// 	label 'mem_64GB'
-// 	label 'core_36'
-// 	input:
-// 		tuple val(sample), path(read_1), path(read_2)
-//         path(fasta)
-// 	output:
-// 		tuple val(sample), path("${sample}_pre.bam"), path("${sample}_pre.bam.bai")
-// 	script:
-// 		"""
-
-// 		READ_GROUP_NAME=\$( zgrep @ ${read_1} | \
-// 					head -n 1 | \
-// 					cut -d :  -f1 | \
-// 					sed 's/@//g' )
-
-// 		bwa mem -t ${task.cpus} \
-// 			${fasta}/${fasta}.fa \
-// 			${read_1} \
-// 			${read_2} | \
-// 		samtools view --reference ${fasta}/${fasta}.fa \
-// 					  --threads ${task.cpus} \
-// 					  --bam | \
-// 		samtools sort -@ ${task.cpus} \
-// 					  -O bam \
-// 					  -o /dev/stdout | \
-// 		gatk AddOrReplaceReadGroups \
-// 					  -I /dev/stdin \
-// 					  -O  ${sample}_pre.bam \
-// 					  -RGID \$READ_GROUP_NAME \
-// 					  -RGLB lib1 \
-// 					  -RGPL ILLUMINA \
-// 					  -RGPU unit1 \
-// 					  -RGSM ${sample} \
-// 					  --CREATE_INDEX true
-
-// 		samtools index -@ ${task.cpus} ${sample}_pre.bam
-
-// 		gatk ValidateSamFile -I  ${sample}_pre.bam -R ${fasta}/${fasta}.fa
-
-
-// 		"""
-// }
-
 process BWA_MAP_READS {
 	tag "${sample}"
 	label 'gatk'
@@ -87,7 +41,6 @@ process BWA_MAP_READS {
 
 
 process BASE_RECALIBRATOR {
-	publishDir "${params.outfolder}/${params.runID}/BAM", mode: 'symlink', overwrite: true
 	tag "${sample}"
 	label 'gatk'
 	label 'mem_16GB'
@@ -111,7 +64,7 @@ process BASE_RECALIBRATOR {
 		done
 
 		gatk BaseRecalibrator \
-		-I ${bam} \
+		-I output.bam \
 		-R ${fasta}/${fasta}.fa \
 		-L ${interval_list} \
 		--known-sites ${snv_resource} \
@@ -122,7 +75,6 @@ process BASE_RECALIBRATOR {
 }
 
 process APPLY_BQSR {
-	publishDir "${params.outfolder}/${params.runID}/BAM", mode: 'symlink', overwrite: true
 	tag "${sample}"
 	label 'gatk'
 	label 'mem_16GB'
@@ -135,10 +87,10 @@ process APPLY_BQSR {
 		tuple val(sample), path("${sample}_recal.bam"), path("${sample}_recal.bam.bai")
 	script:
 		"""
+
 		gatk ApplyBQSR \
 		-R ${fasta}/${fasta}.fa \
-		-L ${interval_list} \
-		-I ${bam} \
+		-I output.bam \
 		--bqsr-recal-file ${recal_table} \
 		-O ${sample}_recal.bam
 
