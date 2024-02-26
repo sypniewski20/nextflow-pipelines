@@ -25,7 +25,7 @@ include { BWA_MAP_READS; BASE_RECALIBRATOR; APPLY_BQSR; SAMBAMBA_MARK_DUPLICATES
 include { FASTQ_TO_SAM; BWA_SPARK_MAP_READS; BQSR_SPARK; MARK_DUPLICATES_SPARK } from './modules/spark_workflows.nf'
 include { DEEP_VARIANT; FILTER_SNVS; FILTER_AND_MERGE_SNVS } from "./modules/deepvariant.nf"
 include { DELLY_CNV_CALL; DELLY_FILTER_VCF; DELLY_MERGE_SITES; DELLY_MERGED_SITES_CALL; DELLY_MERGED_FILTER } from "./modules/delly.nf"
-include { MANTA_CNV_CALL; MANTA_FILTER_VCF; JOINT_MANTA_CNV_CALL; JOINT_MANTA_FILTER_VCF } from "./modules/manta.nf"
+include { MANTA_CNV_CALL; MANTA_FILTER_VCF } from "./modules/manta.nf"
 include { ERDS_CNV_CALL; ERDS_FILTER_VCF; ERDS_FILTER_AND_MERGE_VCF } from "./modules/erds.nf"
 include { CNVPYTOR_CALL; CNVPYTOR_FILTER_VCF; CNVPYTOR_MERGE_CALLS; CNVPYTOR_FILTER_MERGED } from "./modules/CNVpytor.nf"
 include { WRITE_BAM_CHECKPOINT } from './modules/checkpoint.nf'
@@ -132,8 +132,8 @@ workflow paired_end_cnv_call {
 			DELLY_MERGE_SITES(DELLY_CNV_CALL.out.collect())
 			DELLY_MERGED_SITES_CALL(ch_samples_checkpoint, fasta, centromeres, DELLY_MERGE_SITES.out)
 			DELLY_MERGED_FILTER(DELLY_MERGED_SITES_CALL.out.collect()) | set { delly_output }
-			JOINT_MANTA_CNV_CALL(ch_samples_checkpoint.collect(), fasta)
-			JOINT_MANTA_FILTER_VCF(JOINT_MANTA_CNV_CALL.out) | set {manta_output}
+			MANTA_FILTER_VCF(MANTA_CNV_CALL.out)
+			MANTA_FILTER_VCF.out | set { manta_output }
 		}
 	emit:
 		delly_output

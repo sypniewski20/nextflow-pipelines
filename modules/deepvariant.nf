@@ -49,7 +49,7 @@ process FILTER_SNVS {
 
 process FILTER_AND_MERGE_SNVS {
     publishDir "${params.outfolder}/${params.runID}/SNV/", mode: 'copy', overwrite: true
-    label 'gatk'
+    label 'glnexus'
 	label 'mem_256GB'
 	label 'core_36'
 	input:
