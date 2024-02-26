@@ -120,20 +120,18 @@ workflow paired_end_cnv_call {
 		fasta
 		centromeres
 	main:
+		MANTA_CNV_CALL(ch_samples_checkpoint, fasta)
+		MANTA_FILTER_VCF(MANTA_CNV_CALL.out)
+		MANTA_FILTER_VCF.out | set { manta_output }
 		if (params.cohort_mode == false) {
 			DELLY_CNV_CALL(ch_samples_checkpoint, fasta, centromeres)
 			DELLY_FILTER_VCF(DELLY_CNV_CALL.out)
 			DELLY_FILTER_VCF.out | set { delly_output }
-			MANTA_CNV_CALL(ch_samples_checkpoint, fasta)
-			MANTA_FILTER_VCF(MANTA_CNV_CALL.out)
-			MANTA_FILTER_VCF.out | set { manta_output }
 		} else {
 			DELLY_CNV_CALL(ch_samples_checkpoint, fasta, centromeres)
 			DELLY_MERGE_SITES(DELLY_CNV_CALL.out.collect())
 			DELLY_MERGED_SITES_CALL(ch_samples_checkpoint, fasta, centromeres, DELLY_MERGE_SITES.out)
 			DELLY_MERGED_FILTER(DELLY_MERGED_SITES_CALL.out.collect()) | set { delly_output }
-			MANTA_FILTER_VCF(MANTA_CNV_CALL.out)
-			MANTA_FILTER_VCF.out | set { manta_output }
 		}
 	emit:
 		delly_output
