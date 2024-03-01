@@ -27,7 +27,7 @@ process FASTQ_TO_SAM {
 			--PLATFORM_UNIT A \
 			--PLATFORM illumina \
 			--SEQUENCING_CENTER BI \
-			--RUN_DATE ${params.date} \
+			--RUN_DATE ${params.runDate} \
 			--MAX_RECORDS_IN_RAM 5000000
 
 		sambamba view --nthreads ${task.cpus} -H ${sample}_temp_unmapped.bam > new_header.bam
@@ -53,17 +53,17 @@ process BWA_SPARK_MAP_READS {
         path(fasta)
 		path(interval_list)
 	output:
-		tuple val(sample), path("${sample}_pre_sorted.bam"), path("${sample}_pre_sorted.bam.bai"), path("${sample}_pre_sorted.bam.sbi"), emit: bam
+		tuple val(sample), path("${sample}_markdups_sorted.bam"), path("${sample}_markdups_sorted.bam.bai"), path("${sample}_markdups_sorted.bam.sbi"), emit: bam
 	script:
 		"""
 
-		gatk BwaSpark \
+		gat BwaAndMarkDuplicatesPipelineSpark \
 			--spark-master local[${task.cpus}] \
 			--tmp-dir ${params.spark_tmp} \
 			-R ${fasta}/${fasta}.fa \
-		-L ${interval_list} \
+			-L ${interval_list} \
 			-I ${bam} \
-			-O ${sample}_temp.bam
+			-O ${sample}_markdups.bam
 		
 		if \$( samtools flagstat ${sample}_temp.bam | grep -q "^0 + 0 in total (QC-passed reads + QC-failed reads)\$" ); then
         	echo "${sample}_temp.bam is empty"
@@ -71,18 +71,18 @@ process BWA_SPARK_MAP_READS {
 		fi
 
 		sambamba sort --nthreads ${task.cpus} --memory-limit ${task.memory} \
-		-o ${sample}_pre_sorted \
-		${sample}_temp.bam
+		-o ${sample}_markdups_sorted \
+		${sample}_markdups.bam
 
 		gatk ValidateSamFile \
-			-I ${sample}_pre_sorted.bam \
+			-I ${sample}_markdups_sorted.bam \
 			-MODE SUMMARY
 
 		gatk CreateHadoopBamSplittingIndex \
 			--tmp-dir ${params.spark_tmp} \
 			--create-bai \
-			-I ${sample}_pre_sorted.bam \
-			-O ${sample}_pre_sorted.bam.sbi 
+			-I ${sample}_markdups_sorted.bam \
+			-O ${sample}_markdups_sorted.bam.sbi 
 
 		"""
 }
@@ -100,7 +100,8 @@ process BQSR_SPARK  {
 		path(cnv_resource)
 		path(sv_resource)
 	output:
-		tuple val(sample), path("${sample}_recal.bam"), path("${sample}_recal.bam.bai")
+		tuple val(sample), path("${sample}_recal.bam"), path("${sample}_recal.bam.bai"), emit: ch_bam
+		path("${sample}.txt"), emit: sample_checkpoint
 	script:
 		"""
 
@@ -122,18 +123,20 @@ process BQSR_SPARK  {
 		--known-sites ${snv_resource} \
 		--known-sites ${cnv_resource} \
 		--known-sites ${sv_resource} \
-		-O ${sample}_recal.bam
+		-O ${sample}_markdups_sorted_recal.bam
 
 		gatk ValidateSamFile \
-			-I ${sample}_recal.bam \
+			-I ${sample}_markdups_sorted_recal.bam \
 			-MODE SUMMARY
 
-		if \$( samtools flagstat ${sample}_recal.bam | grep -q "^0 + 0 in total (QC-passed reads + QC-failed reads)\$" ); then
-        	echo "${sample}_recal.bam is empty"
+		if \$( samtools flagstat ${sample}_markdups_sorted_recal.bam | grep -q "^0 + 0 in total (QC-passed reads + QC-failed reads)\$" ); then
+        	echo "${sample}_markdups_sorted_recal.bam is empty"
 			exit 1
 		fi
 		
-		samtools index -@ ${task.cpus} ${sample}_recal.bam
+		samtools index -@ ${task.cpus} ${sample}_markdups_sorted_recal.bam
+
+		echo -e "${sample}\\t${params.outfolder}/${params.runID}/BAM/${sample}_markdups_sorted_recal.bam\\t${params.outfolder}/${params.runID}/BAM/${sample}_markdups_sorted_recal.bam.bai" > ${sample}.txt
 
 		"""
 }

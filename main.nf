@@ -72,14 +72,13 @@ workflow mapping_workflow {
 			FASTQ_TO_SAM(ch_fastp_results, fasta)
 			BWA_SPARK_MAP_READS(FASTQ_TO_SAM.out, fasta, interval_list)		
 			BQSR_SPARK(BWA_SPARK_MAP_READS.out, fasta, interval_list, snv_resource, cnv_resource, sv_resource)
-			MARK_DUPLICATES_SPARK(BQSR_SPARK.out, interval_list)
-			MARK_DUPLICATES_SPARK.out.ch_bam | set { ch_bam_filtered }
-			WRITE_BAM_CHECKPOINT(MARK_DUPLICATES_SPARK.out.sample_checkpoint.collect())
+			BQSR_SPARK.out.ch_bam | set { ch_bam }
+			WRITE_BAM_CHECKPOINT(BQSR_SPARK.out.sample_checkpoint.collect())
 		}
 		WRITE_BAM_CHECKPOINT.out | set { ch_checkpoint }
 		MOSDEPTH_WGS(ch_bam_filtered)
 	emit:
-		ch_bam_filtered
+		ch_bam
 		ch_checkpoint
 }
 
