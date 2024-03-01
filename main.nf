@@ -66,7 +66,7 @@ workflow mapping_workflow {
 			BASE_RECALIBRATOR(BWA_MAP_READS.out, fasta, interval_list, snv_resource, cnv_resource, sv_resource)
 			APPLY_BQSR(BASE_RECALIBRATOR.out, interval_list, fasta)
 			SAMBAMBA_MARK_DUPLICATES(APPLY_BQSR.out)
-			SAMBAMBA_MARK_DUPLICATES.out.ch_bam | set { ch_bam_filtered }
+			SAMBAMBA_MARK_DUPLICATES.out.ch_bam | set { ch_bam }
 			WRITE_BAM_CHECKPOINT(SAMBAMBA_MARK_DUPLICATES.out.sample_checkpoint.collect())
 		} else {
 			FASTQ_TO_SAM(ch_fastp_results, fasta)
@@ -76,7 +76,7 @@ workflow mapping_workflow {
 			WRITE_BAM_CHECKPOINT(BQSR_SPARK.out.sample_checkpoint.collect())
 		}
 		WRITE_BAM_CHECKPOINT.out | set { ch_checkpoint }
-		MOSDEPTH_WGS(ch_bam_filtered)
+		MOSDEPTH_WGS(ch_bam)
 	emit:
 		ch_bam
 		ch_checkpoint
@@ -113,8 +113,8 @@ workflow manta_call {
 	take:
 		ch_samples_checkpoint
 		fasta
-		centromeres
 	main:
+		MANTA_CNV_CALL(ch_samples_checkpoint, fasta)
 		MANTA_FILTER_VCF(MANTA_CNV_CALL.out)
 		MANTA_FILTER_VCF.out | set { manta_output }
 	emit:
@@ -134,7 +134,7 @@ workflow {
 						 params.snv_resource, 
 						 params.cnv_resource, 
 						 params.sv_resource)
-		bam_input = mapping_workflow.out.ch_bam_filtered
+		bam_input = mapping_workflow.out.ch_bam
 	} else {
 		bam_checkpoint(params.bam_samplesheet) | set { bam_input }
 	}
