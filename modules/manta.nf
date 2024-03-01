@@ -1,7 +1,7 @@
 process MANTA_CNV_CALL {
 	tag "${sample}"
 	label 'manta'
-	label 'mem_4GB'
+	label 'mem_8GB'
 	label 'core_18'
 	input:
 		tuple val(sample), path(bam), path(bai)
