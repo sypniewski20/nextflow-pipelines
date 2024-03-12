@@ -20,11 +20,12 @@ SV					:${params.sv_resource}
 .stripIndent()
 
 include { Read_samplesheet; Read_bam_checkpoint } from './modules/functions.nf'
-include { CHECK_INTEGRITY; FASTQC_PROCESSING; FASTP_PROCESSING; MOSDEPTH_WGS} from './modules/seqQC.nf'
+include { FASTQC_PROCESSING; FASTP_PROCESSING; MOSDEPTH_WGS} from './modules/seqQC.nf'
 include { BWA_MAP_READS; BASE_RECALIBRATOR; APPLY_BQSR; SAMBAMBA_MARK_DUPLICATES } from './modules/mapping.nf'
 include { FASTQ_TO_SAM; BWA_SPARK_MAP_READS; BQSR_SPARK; MARK_DUPLICATES_SPARK } from './modules/spark_workflows.nf'
 include { DEEP_VARIANT; FILTER_SNVS; FILTER_AND_MERGE_SNVS } from "./modules/deepvariant.nf"
-include { MANTA_CNV_CALL; MANTA_FILTER_VCF } from "./modules/manta.nf"
+include { MANTA_GERMLINE; MANTA_FILTER_VCF; MANTA_MERGE_VCF } from "./modules/manta.nf"
+include { VEP; ANNOT_SV } from "./modules/annotations.nf"
 include { WRITE_BAM_CHECKPOINT } from './modules/checkpoint.nf'
 
 
@@ -41,9 +42,8 @@ workflow fastq_QC_workflow {
 	take:
 		ch_samples_initial
 	main:
-		CHECK_INTEGRITY(ch_samples_initial)
-		FASTQC_PROCESSING(CHECK_INTEGRITY.out) | set { fastqc_log }
-		FASTP_PROCESSING(CHECK_INTEGRITY.out)
+		FASTQC_PROCESSING(ch_samples_initial) | set { fastqc_log }
+		FASTP_PROCESSING(ch_samples_initial)
 		FASTP_PROCESSING.out.fastq_filtered | set { ch_fastp_results }
 		FASTP_PROCESSING.out.fastp_log | set { fastp_log }
 	emit:
@@ -76,7 +76,11 @@ workflow mapping_workflow {
 			WRITE_BAM_CHECKPOINT(BQSR_SPARK.out.sample_checkpoint.collect())
 		}
 		WRITE_BAM_CHECKPOINT.out | set { ch_checkpoint }
-		MOSDEPTH_WGS(ch_bam)
+		if( params.exome == false ) {
+			MOSDEPTH_WGS(ch_bam_filtered)
+		} else if( params.exome == false ) {
+			MOSDEPTH_EXOME(ch_bam_filtered)
+		}
 	emit:
 		ch_bam
 		ch_checkpoint
@@ -98,7 +102,7 @@ workflow snv_call {
 	main:
 		if( params.cohort_mode == false ) {
 			DEEP_VARIANT(ch_samples_checkpoint, fasta)
-			FILTER_SNVS(DEEP_VARIANT.out, fasta)
+			FILTER_SNVS(DEEP_VARIANT.out)
 			FILTER_SNVS.out | set { ch_snv_call }
 		} else {
 			DEEP_VARIANT(ch_samples_checkpoint, fasta)
@@ -109,16 +113,43 @@ workflow snv_call {
 		ch_snv_call
 }
 
-workflow manta_call {
+workflow sv_call {
 	take:
 		ch_samples_checkpoint
 		fasta
 	main:
-		MANTA_CNV_CALL(ch_samples_checkpoint, fasta)
-		MANTA_FILTER_VCF(MANTA_CNV_CALL.out)
-		MANTA_FILTER_VCF.out | set { manta_output }
+		if( params.exome == false ) {
+			MANTA_GERMLINE(ch_samples_checkpoint, fasta)
+			MANTA_FILTER_VCF(MANTA_GERMLINE.out)
+		} else {
+			MANTA_EXOME_GERMLINE(ch_samples_checkpoint, fasta)
+			MANTA_FILTER_VCF(MANTA_EXOME_GERMLINE.out)
+		}
+		if( params.cohort_mode == false) {
+			MANTA_FILTER_VCF.out | set { ch_sv_output }
+		} else {
+			MANTA_FILTER_VCF.out
+				.map{ sample, vcf, tbi -> vcf }
+				.collect()
+				.set{ vcf_input }
+			MANTA_FILTER_VCF.out
+				.map{ sample, vcf, tbi -> tbi }
+				.collect()
+				.set{ tbi_input }
+			MANTA_MERGE_VCF(vcf_input, tbi_input) | set { ch_sv_output }
+		}
 	emit:
-		manta_output
+		ch_sv_output
+}
+
+workflow annotation_workflow {
+	take:
+		ch_snv_call
+		ch_sv_output
+		fasta
+	main:
+		VEP(ch_snv_call, fasta)
+		ANNOT_SV(ch_sv_output)
 }
 
 //Main workflow
@@ -140,8 +171,9 @@ workflow {
 	}
 		snv_call(bam_input, 
 				 params.fasta)
-		manta_call(bam_input, 
+		sv_call(bam_input, 
 					params.fasta)
+		annotation_workflow(snv_call.out, sv_call.out, params.fasta)
 }
 
 workflow.onComplete {

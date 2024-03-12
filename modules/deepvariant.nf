@@ -32,7 +32,6 @@ process FILTER_SNVS {
 	label 'core_8'
 	input:
 		tuple val(sample), path(vcf)
-		path(fasta)
 	output:
 		tuple val(sample), path("${sample}_deepvariant_filtered.vcf.gz"), path("${sample}_deepvariant_filtered.vcf.gz.tbi")
 	script:

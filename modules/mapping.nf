@@ -5,7 +5,7 @@ process BWA_MAP_READS {
 	label 'core_36'
 	input:
 		tuple val(sample), path(read_1), path(read_2)
-        path(fasta)
+		path(fasta)
 	output:
 		tuple val(sample), path("${sample}_pre.bam"), path("${sample}_pre.bam.bai")
 	script:
@@ -90,6 +90,7 @@ process APPLY_BQSR {
 
 		gatk ApplyBQSR \
 		-R ${fasta}/${fasta}.fa \
+		-L ${interval_list} \
 		-I output.bam \
 		--bqsr-recal-file ${recal_table} \
 		-O ${sample}_recal.bam
@@ -99,37 +100,6 @@ process APPLY_BQSR {
 		gatk ValidateSamFile -I ${sample}_recal.bam \
 							 -M SUMMARY
 
-		"""
-}
-
-process GATK_MARK_DUPLICATES {
-	publishDir "${params.outfolder}/${params.runID}/BAMQC", pattern: "${sample}.dup_metrics.*", mode: 'copy', overwrite: true
-	publishDir "${params.outfolder}/${params.runID}/BAM", pattern: "${sample}_recal_dupfiltered.bam*", mode: 'copy', overwrite: true
-	tag "${sample}"
-	label 'gatk'
-	label 'mem_16GB'
-	label 'core_1'
-	input:
-		tuple val(sample), path(bam), path(bai)
-		path(interval_list)
-	output:
-		tuple val(sample),  path("${sample}_recal_dupfiltered.bam"), path("${sample}_recal_dupfiltered.bam.bai"), emit: ch_bam
-		path("${sample}.txt"), emit: sample_checkpoint
-	script:
-		"""
-       	gatk MarkDuplicates \
-            -I ${bam} \
-            -O ${sample}_recal_dupfiltered.bam \
-            -M ${sample}.dup_metrics.txt \
-			--MAX_RECORDS_IN_RAM 5000000 \
-			--CREATE_INDEX true
-		
-		if \$( samtools flagstat ${sample}_recal_dupfiltered.bam | grep -q "^0 + 0 in total (QC-passed reads + QC-failed reads)\$" ); then
-        	echo "${sample}_recal_dupfiltered.bam is empty"
-			exit 1
-		fi
-
-		echo -e "${sample}\\t${is_germline}\\t${params.outfolder}/${params.runID}/BAM/${sample}_recal_dupfiltered.bam\\t${params.outfolder}/${params.runID}/BAM/${sample}_recal_dupfiltered.bam.bai" > ${sample}.txt
 		"""
 }
 
