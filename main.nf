@@ -78,7 +78,7 @@ workflow mapping_workflow {
 		WRITE_BAM_CHECKPOINT.out | set { ch_checkpoint }
 		if( params.exome == false ) {
 			MOSDEPTH_WGS(ch_bam_filtered)
-		} else ( params.exome == false ) {
+		} else ( params.exome == true ) {
 			MOSDEPTH_EXOME(ch_bam_filtered)
 		}
 	emit:
