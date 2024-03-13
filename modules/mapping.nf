@@ -64,7 +64,7 @@ process BASE_RECALIBRATOR {
 		done
 
 		gatk BaseRecalibrator \
-		-I output.bam \
+		-I ${bam} \
 		-R ${fasta}/${fasta}.fa \
 		-L ${interval_list} \
 		--known-sites ${snv_resource} \
@@ -91,7 +91,7 @@ process APPLY_BQSR {
 		gatk ApplyBQSR \
 		-R ${fasta}/${fasta}.fa \
 		-L ${interval_list} \
-		-I output.bam \
+		-I ${bam} \
 		--bqsr-recal-file ${recal_table} \
 		-O ${sample}_recal.bam
 
