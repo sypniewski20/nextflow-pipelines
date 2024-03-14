@@ -63,18 +63,13 @@ workflow mapping_workflow {
 	main:
 		if( params.run_spark == false ) {
 			BWA_MAP_READS(ch_fastp_results, fasta)		
-			BASE_RECALIBRATOR(BWA_MAP_READS.out, fasta, interval_list, snv_resource, cnv_resource, sv_resource)
-			APPLY_BQSR(BASE_RECALIBRATOR.out, interval_list, fasta)
-			SAMBAMBA_MARK_DUPLICATES(APPLY_BQSR.out)
+			SAMBAMBA_MARK_DUPLICATES(BWA_MAP_READS.out)
 			SAMBAMBA_MARK_DUPLICATES.out.ch_bam | set { ch_bam_filtered }
 			WRITE_BAM_CHECKPOINT(SAMBAMBA_MARK_DUPLICATES.out.sample_checkpoint.collect())
 		} else {
 			FASTQ_TO_SAM(ch_fastp_results, fasta)
 			BWA_SPARK_MAP_READS(FASTQ_TO_SAM.out, fasta, interval_list)		
-			BQSR_SPARK(BWA_SPARK_MAP_READS.out, fasta, interval_list, snv_resource, cnv_resource, sv_resource)
-			MARK_DUPLICATES_SPARK(BQSR_SPARK.out, interval_list)
-			MARK_DUPLICATES_SPARK.out.ch_bam | set { ch_bam_filtered }
-			WRITE_BAM_CHECKPOINT(MARK_DUPLICATES_SPARK.out.sample_checkpoint.collect())
+			WRITE_BAM_CHECKPOINT(BWA_SPARK_MAP_READS.out.sample_checkpoint.collect())
 		}
 		WRITE_BAM_CHECKPOINT.out | set { ch_checkpoint }
 		if( params.exome == false ) {

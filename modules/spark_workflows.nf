@@ -53,11 +53,11 @@ process BWA_SPARK_MAP_READS {
         path(fasta)
 		path(interval_list)
 	output:
-		tuple val(sample), path("${sample}_pre_sorted.bam"), path("${sample}_pre_sorted.bam.bai"), path("${sample}_pre_sorted.bam.sbi"), emit: bam
+		tuple val(sample), path("${sample}_sorted_markdup.bam"), path("${sample}_sorted_markdup.bam.bai"), emit: bam
 	script:
 		"""
 
-		gatk BwaSpark \
+		gatk BwaAndMarkDuplicatesPipelineSpark \
 			--spark-master local[${task.cpus}] \
 			--tmp-dir ${params.spark_tmp} \
 			-R ${fasta}/${fasta}.fa \
@@ -71,110 +71,12 @@ process BWA_SPARK_MAP_READS {
 		fi
 
 		sambamba sort --nthreads ${task.cpus} --memory-limit ${task.memory} \
-		-o ${sample}_pre_sorted \
+		-o ${sample}_sorted_markdup \
 		${sample}_temp.bam
 
 		gatk ValidateSamFile \
-			-I ${sample}_pre_sorted.bam \
+			-I ${sample}_sorted_markdup.bam \
 			-MODE SUMMARY
 
-		gatk CreateHadoopBamSplittingIndex \
-			--tmp-dir ${params.spark_tmp} \
-			--create-bai \
-			-I ${sample}_pre_sorted.bam \
-			-O ${sample}_pre_sorted.bam.sbi 
-
-		"""
-}
-
-process BQSR_SPARK  {
-	tag "${sample}"
-	label 'gatk'
-	label 'mem_256GB'
-	label 'core_64'
-	input:
-		tuple val(sample), path(bam), path(bai)
-		path(fasta)
-		path(interval_list)
-		path(snv_resource)
-		path(cnv_resource)
-		path(sv_resource)
-	output:
-		tuple val(sample), path("${sample}_recal.bam"), path("${sample}_recal.bam.bai")
-	script:
-		"""
-
-		ln -sf \$( echo "\$( realpath ${snv_resource} ).tbi" ) .
-		ln -sf \$( echo "\$( realpath ${cnv_resource} ).tbi" ) .
-		ln -sf \$( echo "\$( realpath ${sv_resource} ).tbi" ) .
-
-		gatk CreateHadoopBamSplittingIndex \
-			--create-bai \
-			-I ${bam} \
-			-O ${bam}.sbi 
-
-		gatk BQSRPipelineSpark \
-		--spark-master local[${task.cpus}] \
-		--tmp-dir ${params.spark_tmp} \
-		-L ${interval_list} \
-		-I ${bam} \
-		-R ${fasta}/${fasta}.fa \
-		--known-sites ${snv_resource} \
-		--known-sites ${cnv_resource} \
-		--known-sites ${sv_resource} \
-		-O ${sample}_recal.bam
-
-		gatk ValidateSamFile \
-			-I ${sample}_recal.bam \
-			-MODE SUMMARY
-
-		if \$( samtools flagstat ${sample}_recal.bam | grep -q "^0 + 0 in total (QC-passed reads + QC-failed reads)\$" ); then
-        	echo "${sample}_recal.bam is empty"
-			exit 1
-		fi
-		
-		samtools index -@ ${task.cpus} ${sample}_recal.bam
-
-		"""
-}
-
-process MARK_DUPLICATES_SPARK {
-	publishDir "${params.outfolder}/${params.runID}/BAMQC", pattern: "${sample}.dup_metrics.*", mode: 'copy', overwrite: true
-	publishDir "${params.outfolder}/${params.runID}/BAM", pattern: "${sample}_recal_dupfiltered.bam*", mode: 'copy', overwrite: true
-	tag "${sample}"
-	label 'gatk'
-	label 'mem_256GB'
-	label 'core_64'
-	input:
-		tuple val(sample), path(bam), path(bai)
-		path(interval_list)
-	output:
-		tuple val(sample),  path("${sample}_recal_dupfiltered.bam"), path("${sample}_recal_dupfiltered.bam.bai"), emit: ch_bam
-		path("${sample}.txt"), emit: sample_checkpoint
-	script:
-		"""
-       gatk MarkDuplicatesSpark \
-			--tmp-dir ${params.spark_tmp} \
-            -I ${bam} \
-            -O ${sample}_recal_dupfiltered.bam \
-            -M ${sample}.dup_metrics.txt \
-			-L ${interval_list} \
-            --conf 'spark.executor.cores=${task.cpus}'
-
-		gatk ValidateSamFile \
-			-I ${sample}_recal_dupfiltered.bam \
-			-MODE SUMMARY
-
-		if \$( samtools flagstat ${sample}_recal_dupfiltered.bam | grep -q "^0 + 0 in total (QC-passed reads + QC-failed reads)\$" ); then
-        	echo "${sample}_recal_dupfiltered.bam is empty"
-			exit 1
-		fi
-
-	   gatk CreateHadoopBamSplittingIndex \
-			-I  ${sample}_recal_dupfiltered.bam \
-			-O ${sample}_recal_dupfiltered.bam.sbi \
-			--create-bai
-
-		echo -e "${sample}\\t${params.outfolder}/${params.runID}/BAM/${sample}_recal_dupfiltered.bam\\t${params.outfolder}/${params.runID}/BAM/${sample}_recal_dupfiltered.bam.bai" > ${sample}.txt
 		"""
 }
