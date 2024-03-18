@@ -21,10 +21,11 @@ SV					:${params.sv_resource}
 
 include { Read_samplesheet; Read_bam_checkpoint } from './modules/functions.nf'
 include { FASTQC_PROCESSING; FASTP_PROCESSING; MOSDEPTH_WGS} from './modules/seqQC.nf'
-include { BWA_MAP_READS; BASE_RECALIBRATOR; APPLY_BQSR; SAMBAMBA_MARK_DUPLICATES } from './modules/mapping.nf'
-include { FASTQ_TO_SAM; BWA_SPARK_MAP_READS; BQSR_SPARK; MARK_DUPLICATES_SPARK } from './modules/spark_workflows.nf'
+include { BWA_MAP_READS; SAMBAMBA_MARK_DUPLICATES } from './modules/mapping.nf'
+include { BASE_RECALIBRATOR; APPLY_BQSR; BQSR_SPARK } from './modules/bqsr.nf'
+include { FASTQ_TO_SAM; SPARK_BWA_MAP_MARK_DUPLICATES } from './modules/spark_workflows.nf'
 include { DEEP_VARIANT; FILTER_SNVS; FILTER_AND_MERGE_SNVS } from "./modules/deepvariant.nf"
-include { MANTA_GERMLINE; MANTA_FILTER_VCF; MANTA_MERGE_VCF } from "./modules/manta.nf"
+include { MANTA_GERMLINE; MANTA_EXOME_GERMLINE; MANTA_FILTER_VCF; MANTA_MERGE_VCF } from "./modules/manta.nf"
 include { VEP; ANNOT_SV } from "./modules/annotations.nf"
 include { WRITE_BAM_CHECKPOINT } from './modules/checkpoint.nf'
 
@@ -57,19 +58,52 @@ workflow mapping_workflow {
 		ch_fastp_results
 		fasta
 		interval_list
+	main:
+		if( params.run_spark == false ) {
+			BWA_MAP_READS(ch_fastp_results, fasta)		
+			SAMBAMBA_MARK_DUPLICATES(BWA_MAP_READS.out)
+			SAMBAMBA_MARK_DUPLICATES.out.bam | set { ch_bam }
+			WRITE_BAM_CHECKPOINT(SAMBAMBA_MARK_DUPLICATES.out.sample_checkpoint.collect())
+		} else {
+			FASTQ_TO_SAM(ch_fastp_results, fasta)
+			SPARK_BWA_MAP_MARK_DUPLICATES(FASTQ_TO_SAM.out, fasta, interval_list)		
+			SPARK_BWA_MAP_MARK_DUPLICATES.out.bam | set { ch_bam }
+			WRITE_BAM_CHECKPOINT(SPARK_BWA_MAP_MARK_DUPLICATES.out.sample_checkpoint.collect())
+		}
+		WRITE_BAM_CHECKPOINT.out | set { ch_checkpoint }
+		if( params.exome == false ) {
+			MOSDEPTH_WGS(ch_bam)
+		} else if( params.exome == false ) {
+			MOSDEPTH_EXOME(ch_bamd)
+		}
+	emit:
+		ch_bam
+		ch_checkpoint
+}
+
+workflow bqsr_mapping_workflow {
+	take:
+		ch_fastp_results
+		fasta
+		interval_list
 		snv_resource
 		cnv_resource
 		sv_resource
 	main:
 		if( params.run_spark == false ) {
 			BWA_MAP_READS(ch_fastp_results, fasta)		
-			SAMBAMBA_MARK_DUPLICATES(BWA_MAP_READS.out)
+			BASE_RECALIBRATOR(BWA_MAP_READS.out, fasta, interval_list, snv_resource, cnv_resource, sv_resource)
+			APPLY_BQSR(BASE_RECALIBRATOR.out, interval_list, fasta)
+			SAMBAMBA_MARK_DUPLICATES(APPLY_BQSR.out)
 			SAMBAMBA_MARK_DUPLICATES.out.ch_bam | set { ch_bam_filtered }
 			WRITE_BAM_CHECKPOINT(SAMBAMBA_MARK_DUPLICATES.out.sample_checkpoint.collect())
 		} else {
 			FASTQ_TO_SAM(ch_fastp_results, fasta)
 			BWA_SPARK_MAP_READS(FASTQ_TO_SAM.out, fasta, interval_list)		
-			WRITE_BAM_CHECKPOINT(BWA_SPARK_MAP_READS.out.sample_checkpoint.collect())
+			BQSR_SPARK(BWA_SPARK_MAP_READS.out, fasta, interval_list, snv_resource, cnv_resource, sv_resource)
+			MARK_DUPLICATES_SPARK(BQSR_SPARK.out, interval_list)
+			MARK_DUPLICATES_SPARK.out.ch_bam | set { ch_bam_filtered }
+			WRITE_BAM_CHECKPOINT(MARK_DUPLICATES_SPARK.out.sample_checkpoint.collect())
 		}
 		WRITE_BAM_CHECKPOINT.out | set { ch_checkpoint }
 		if( params.exome == false ) {
@@ -152,24 +186,71 @@ workflow annotation_workflow {
 
 workflow {
 	main:
-	if (params.bam_samplesheet.isEmpty()) {
+	if (params.mode == "mapping" ) {
+
 		preprocessing_workflow(params.samplesheet)
+
 		fastq_QC_workflow(preprocessing_workflow.out.ch_samples_initial)
-		mapping_workflow(fastq_QC_workflow.out.ch_fastp_results, 
-						 params.fasta, 
-						 params.interval_list, 
-						 params.snv_resource, 
-						 params.cnv_resource, 
-						 params.sv_resource)
-		bam_input = mapping_workflow.out.ch_bam_filtered
-	} else {
+
+		if (params.bqsr == true) {
+			bqsr_mapping_workflow(fastq_QC_workflow.out.ch_fastp_results, 
+						params.fasta, 
+						params.interval_list)
+
+		} else {
+			mapping_workflow(fastq_QC_workflow.out.ch_fastp_results, 
+						params.fasta, 
+						params.interval_list, 
+						params.snv_resource, 
+						params.cnv_resource, 
+						params.sv_resource)
+
+		}
+		
+	} else if(params.mode == "calling" ) {
+
 		bam_checkpoint(params.bam_samplesheet) | set { bam_input }
-	}
+
 		snv_call(bam_input, 
 				 params.fasta)
+
+		sv_call(bam_input, 
+				params.fasta)
+
+		annotation_workflow(snv_call.out, sv_call.out, params.fasta)
+
+	} else if(params.mode == "both" ) {
+
+		preprocessing_workflow(params.samplesheet)
+
+		fastq_QC_workflow(preprocessing_workflow.out.ch_samples_initial)
+
+		if (params.bqsr == true) {
+			bqsr_mapping_workflow(fastq_QC_workflow.out.ch_fastp_results, 
+						params.fasta, 
+						params.interval_list, 
+						params.snv_resource, 
+						params.cnv_resource, 
+						params.sv_resource)
+
+		} else {
+			mapping_workflow(fastq_QC_workflow.out.ch_fastp_results, 
+						params.fasta, 
+						params.interval_list, 
+						params.snv_resource, 
+						params.cnv_resource, 
+						params.sv_resource)
+
+		}
+
+		snv_call(mapping_workflow.out.ch_bam_filtered, 
+				 params.fasta)
+
 		sv_call(bam_input, 
 					params.fasta)
+
 		annotation_workflow(snv_call.out, sv_call.out, params.fasta)
+	}
 }
 
 workflow.onComplete {

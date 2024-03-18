@@ -113,7 +113,7 @@ process SAMBAMBA_MARK_DUPLICATES {
 	input:
 		tuple val(sample), path(bam), path(bai)
 	output:
-		tuple val(sample),  path("${sample}_recal_dupfiltered.bam"), path("${sample}_recal_dupfiltered.bam.bai"), emit: ch_bam
+		tuple val(sample),  path("${sample}_recal_dupfiltered.bam"), path("${sample}_recal_dupfiltered.bam.bai"), emit: bam
 		path("${sample}.txt"), emit: sample_checkpoint
 	script:
 		"""

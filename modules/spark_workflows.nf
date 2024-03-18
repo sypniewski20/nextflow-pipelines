@@ -1,13 +1,13 @@
 process FASTQ_TO_SAM {
 	tag "${sample}"
 	label 'gatk'
-	label 'mem_96GB'
-	label 'core_36'
+	label 'mem_8GB'
+	label 'core_8'
 	input:
 		tuple val(sample), path(read_1), path(read_2)
 		path(fasta)
 	output:
-		tuple val(sample), path("${sample}_unmapped.bam"), path("${sample}_unmapped.bam.bai")
+		tuple val(sample), path("${sample}_temp_unmapped.bam"), path("${sample}_temp_unmapped.bam.bai")
 	script:
 		"""
 
@@ -27,8 +27,25 @@ process FASTQ_TO_SAM {
 			--PLATFORM_UNIT A \
 			--PLATFORM illumina \
 			--SEQUENCING_CENTER BI \
-			--RUN_DATE ${params.date} \
-			--MAX_RECORDS_IN_RAM 5000000
+			--RUN_DATE ${new java.util.Date().format( 'yyyy-MM-dd' )} \
+			--MAX_RECORDS_IN_RAM 5000000 \
+			--CREATE_INDEX
+
+		"""
+}
+
+process UBAM_HEADER {
+	tag "${sample}"
+	label 'gatk'
+	label 'mem_36GB'
+	label 'core_16'
+	input:
+		tuple val(sample), path(read_1), path(read_2)
+		path(fasta)
+	output:
+		tuple val(sample), path("${sample}_unmapped.bam"), path("${sample}_unmapped.bam.bai")
+	script:
+		"""
 
 		sambamba view --nthreads ${task.cpus} -H ${sample}_temp_unmapped.bam > new_header.bam
 		tail -n +2 ${fasta}/${fasta}.dict >> new_header.bam
@@ -43,10 +60,12 @@ process FASTQ_TO_SAM {
 
 		"""
 }
-process BWA_SPARK_MAP_READS {
+
+process SPARK_BWA_MAP_MARK_DUPLICATES {
+	publishDir "${params.outfolder}/${params.runID}/BAM", pattern: "${sample}_sorted_markdup.bam.*", mode: 'copy', overwrite: true
 	tag "${sample}"
 	label 'gatk'
-	label 'mem_256GB'
+	label 'mem_96GB'
 	label 'core_64'
 	input:
 		tuple val(sample), path(bam), path(bai)
@@ -54,6 +73,7 @@ process BWA_SPARK_MAP_READS {
 		path(interval_list)
 	output:
 		tuple val(sample), path("${sample}_sorted_markdup.bam"), path("${sample}_sorted_markdup.bam.bai"), emit: bam
+		path("${sample}.txt"), emit: sample_checkpoint
 	script:
 		"""
 
@@ -61,22 +81,27 @@ process BWA_SPARK_MAP_READS {
 			--spark-master local[${task.cpus}] \
 			--tmp-dir ${params.spark_tmp} \
 			-R ${fasta}/${fasta}.fa \
-		-L ${interval_list} \
+			-L ${interval_list} \
+			--create-output-bam-index \
+			--create-output-bam-splitting-index \
 			-I ${bam} \
-			-O ${sample}_temp.bam
+			-O ${sample}_sorted_markdup.bam
 		
 		if \$( samtools flagstat ${sample}_temp.bam | grep -q "^0 + 0 in total (QC-passed reads + QC-failed reads)\$" ); then
-        	echo "${sample}_temp.bam is empty"
+        	echo "${sample}_sorted_markdup.bam is empty"
 			exit 1
 		fi
 
-		sambamba sort --nthreads ${task.cpus} --memory-limit ${task.memory} \
-		-o ${sample}_sorted_markdup \
-		${sample}_temp.bam
+		#sambamba sort --nthreads ${task.cpus} --memory-limit ${task.memory} \
+		#-o ${sample}_sorted_markdup \
+		#${sample}_temp.bam
 
 		gatk ValidateSamFile \
 			-I ${sample}_sorted_markdup.bam \
 			-MODE SUMMARY
+
+		echo -e "${sample}\\t${params.outfolder}/${params.runID}/BAM/${sample}_sorted_markdup.bam\\t${params.outfolder}/${params.runID}/BAM/${sample}_sorted_markdup.bam.bai" > ${sample}.txt
+
 
 		"""
 }
