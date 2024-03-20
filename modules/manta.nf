@@ -14,7 +14,8 @@ process MANTA_GERMLINE {
         /manta/bin/configManta.py \
 		--bam ${bam} \
 		--referenceFasta ${fasta}/${fasta}.fa \
-		--runDir manta
+		--runDir manta \
+		--callRegions ${params.contigs_bed}
 
 		manta/runWorkflow.py -j ${task.cpus}
 
@@ -38,7 +39,8 @@ process MANTA_EXOME_GERMLINE {
 		--bam ${bam} \
 		--referenceFasta ${fasta}/${fasta}.fa \
 		--runDir manta \
-		--exome
+		--exome \
+		--callRegions ${params.contigs_bed}
 
 		manta/runWorkflow.py -j ${task.cpus}
 
