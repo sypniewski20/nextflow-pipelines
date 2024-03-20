@@ -19,9 +19,8 @@ SNV					:${params.snv_resource}
 
 include { Read_samplesheet; Read_bam_checkpoint } from './modules/functions.nf'
 include { FASTQC_PROCESSING; FASTP_PROCESSING; MOSDEPTH_WGS} from './modules/seqQC.nf'
-include { BWA_MAP_READS; SAMBAMBA_MARK_DUPLICATES } from './modules/mapping.nf'
+include { BWA_MAP_READS } from './modules/mapping.nf'
 include { BASE_RECALIBRATOR; APPLY_BQSR; BQSR_SPARK } from './modules/bqsr.nf'
-include { FASTQ_TO_SAM; SPARK_BWA_MAP_MARK_DUPLICATES } from './modules/spark_workflows.nf'
 include { DEEP_VARIANT; FILTER_SNVS; FILTER_AND_MERGE_SNVS } from "./modules/deepvariant.nf"
 include { MANTA_GERMLINE; MANTA_EXOME_GERMLINE; MANTA_FILTER_VCF; MANTA_MERGE_VCF } from "./modules/manta.nf"
 include { VEP; ANNOT_SV } from "./modules/annotations.nf"
@@ -58,12 +57,10 @@ workflow mapping_workflow {
 		interval_list
 	main:
 		if (params.bwa == 1) {
-			BWA_MAP_READS(ch_fastp_results, fasta) | set { ch_prebam }	
+			BWA_MAP_READS(ch_fastp_results, fasta) | set { ch_bam }	
 		} else if (params.bwa == 2) {
-			BWAMEM2_MAP_READS(ch_fastp_results, fasta) | set { ch_prebam }
+			BWAMEM2_MAP_READS(ch_fastp_results, fasta) | set { ch_bam }
 		}
-
-		SAMBAMBA_MARK_DUPLICATES(ch_prebam) | set { ch_bam }
 		
 		if( params.exome == false ) {
 			MOSDEPTH_WGS(ch_bam)
@@ -82,14 +79,13 @@ workflow bqsr_mapping_workflow {
 		snv_resource
 	main:
 		if (params.bwa == 1) {
-			BWA_MAP_READS(ch_fastp_results, fasta) | set { ch_prebam }	
+			BWA_MAP_READS(ch_fastp_results, fasta) | set { ch_bam }	
 		} else if (params.bwa == 2) {
-			BWAMEM2_MAP_READS(ch_fastp_results, fasta) | set { ch_prebam }
+			BWAMEM2_MAP_READS(ch_fastp_results, fasta) | set { ch_bam }
 		}
 
-		BASE_RECALIBRATOR(ch_prebam.out, fasta, interval_list, snv_resource)
+		BASE_RECALIBRATOR(ch_bam.out, fasta, interval_list, snv_resource)
 		APPLY_BQSR(BASE_RECALIBRATOR.out, interval_list, fasta)
-		SAMBAMBA_MARK_DUPLICATES(APPLY_BQSR.out) | set { ch_bam }
 
 		if( params.exome == false ) {
 			MOSDEPTH_WGS(ch_bam)

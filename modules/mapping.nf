@@ -7,7 +7,7 @@ process BWA_MAP_READS {
 		tuple val(sample), path(read_1), path(read_2)
 		path(fasta)
 	output:
-		tuple val(sample), path("${sample}_pre.bam"), path("${sample}_pre.bam.bai")
+		tuple val(sample), path("${sample}_markdups.bam"), path("${sample}_markdups.bam.bai")
 	script:
 		"""
 
@@ -23,16 +23,17 @@ process BWA_MAP_READS {
 			${fasta}/${fasta}.fa \
 			${read_1} \
 			${read_2} | \
+		samblaster | \
 		samtools view --reference ${fasta}/${fasta}.fa \
 					  --threads ${task.cpus} \
 					  -b | \
 		samtools sort -@ ${task.cpus} \
 					  -O bam \
-					  --reference ${fasta}/${fasta}.fa >  ${sample}_pre.bam
+					  --reference ${fasta}/${fasta}.fa >  ${sample}_markdups.bam
 
-		sambamba index --nthreads ${task.cpus} ${sample}_pre.bam
+		sambamba index --nthreads ${task.cpus} ${sample}_markdups.bam
 
-		gatk ValidateSamFile -I  ${sample}_pre.bam \
+		gatk ValidateSamFile -I  ${sample}_markdups.bam \
 							 -MODE	SUMMARY
 
 		"""
@@ -47,7 +48,7 @@ process BWAMEM2_MAP_READS {
 		tuple val(sample), path(read_1), path(read_2)
 		path(fasta)
 	output:
-		tuple val(sample), path("${sample}_pre.bam"), path("${sample}_pre.bam.bai")
+		tuple val(sample), path("${sample}_markdups.bam"), path("${sample}_markdups.bam.bai")
 	script:
 		"""
 
@@ -63,17 +64,18 @@ process BWAMEM2_MAP_READS {
 			${fasta}/${fasta}.fa \
 			${read_1} \
 			${read_2} | \
+		samblaster | \
 		samtools view --reference ${fasta}/${fasta}.fa \
 					  --threads ${task.cpus} \
 					  -b | \
 		samtools sort -@ ${task.cpus} \
 					  -O bam \
-					  --reference ${fasta}/${fasta}.fa >  ${sample}_pre.bam
+					  --reference ${fasta}/${fasta}.fa >  ${sample}_markdups.bam
 
-		sambamba index --nthreads ${task.cpus} ${sample}_pre.bam
+		sambamba index --nthreads ${task.cpus} ${sample}_markdups.bam
 
 
-		gatk ValidateSamFile -I  ${sample}_pre.bam \
+		gatk ValidateSamFile -I  ${sample}_markdups.bam \
 							 -MODE	SUMMARY
 
 		"""
