@@ -16,8 +16,7 @@ process DEEP_VARIANT {
         --ref=${fasta}/${fasta}.fa \
         --reads=${bam} \
         --output_vcf=${sample}_deepvariant.vcf.gz \
-        --num_shards=${task.cpus} \
-		--use_original_quality_scores
+        --num_shards=${task.cpus} 
 
 		"""
 
