@@ -13,8 +13,6 @@ Output				:${params.outfolder}
 Fasta 				:${params.fasta}
 Intervals			:${params.interval_list}
 SNV					:${params.snv_resource}
-CNV					:${params.cnv_resource}
-SV					:${params.sv_resource}
 =================================================================================================================
 """
 .stripIndent()
@@ -59,26 +57,21 @@ workflow mapping_workflow {
 		fasta
 		interval_list
 	main:
-		if( params.run_spark == false ) {
-			BWA_MAP_READS(ch_fastp_results, fasta)		
-			SAMBAMBA_MARK_DUPLICATES(BWA_MAP_READS.out)
-			SAMBAMBA_MARK_DUPLICATES.out.bam | set { ch_bam }
-			WRITE_BAM_CHECKPOINT(SAMBAMBA_MARK_DUPLICATES.out.sample_checkpoint.collect())
-		} else {
-			FASTQ_TO_SAM(ch_fastp_results, fasta)
-			SPARK_BWA_MAP_MARK_DUPLICATES(FASTQ_TO_SAM.out, fasta, interval_list)		
-			SPARK_BWA_MAP_MARK_DUPLICATES.out.bam | set { ch_bam }
-			WRITE_BAM_CHECKPOINT(SPARK_BWA_MAP_MARK_DUPLICATES.out.sample_checkpoint.collect())
+		if (params.bwa == 1) {
+			BWA_MAP_READS(ch_fastp_results, fasta) | set { ch_prebam }	
+		} else if (params.bwa == 2) {
+			BWAMEM2_MAP_READS(ch_fastp_results, fasta) | set { ch_prebam }
 		}
-		WRITE_BAM_CHECKPOINT.out | set { ch_checkpoint }
+
+		SAMBAMBA_MARK_DUPLICATES(ch_prebam) | set { ch_bam }
+		
 		if( params.exome == false ) {
 			MOSDEPTH_WGS(ch_bam)
 		} else if( params.exome == false ) {
-			MOSDEPTH_EXOME(ch_bamd)
+			MOSDEPTH_EXOME(ch_bam)
 		}
 	emit:
 		ch_bam
-		ch_checkpoint
 }
 
 workflow bqsr_mapping_workflow {
@@ -87,55 +80,46 @@ workflow bqsr_mapping_workflow {
 		fasta
 		interval_list
 		snv_resource
-		cnv_resource
-		sv_resource
 	main:
-		if( params.run_spark == false ) {
-			BWA_MAP_READS(ch_fastp_results, fasta)		
-			BASE_RECALIBRATOR(BWA_MAP_READS.out, fasta, interval_list, snv_resource, cnv_resource, sv_resource)
-			APPLY_BQSR(BASE_RECALIBRATOR.out, interval_list, fasta)
-			SAMBAMBA_MARK_DUPLICATES(APPLY_BQSR.out)
-			SAMBAMBA_MARK_DUPLICATES.out.ch_bam | set { ch_bam_filtered }
-			WRITE_BAM_CHECKPOINT(SAMBAMBA_MARK_DUPLICATES.out.sample_checkpoint.collect())
-		} else {
-			FASTQ_TO_SAM(ch_fastp_results, fasta)
-			BWA_SPARK_MAP_READS(FASTQ_TO_SAM.out, fasta, interval_list)		
-			BQSR_SPARK(BWA_SPARK_MAP_READS.out, fasta, interval_list, snv_resource, cnv_resource, sv_resource)
-			MARK_DUPLICATES_SPARK(BQSR_SPARK.out, interval_list)
-			MARK_DUPLICATES_SPARK.out.ch_bam | set { ch_bam_filtered }
-			WRITE_BAM_CHECKPOINT(MARK_DUPLICATES_SPARK.out.sample_checkpoint.collect())
+		if (params.bwa == 1) {
+			BWA_MAP_READS(ch_fastp_results, fasta) | set { ch_prebam }	
+		} else if (params.bwa == 2) {
+			BWAMEM2_MAP_READS(ch_fastp_results, fasta) | set { ch_prebam }
 		}
-		WRITE_BAM_CHECKPOINT.out | set { ch_checkpoint }
+
+		BASE_RECALIBRATOR(ch_prebam.out, fasta, interval_list, snv_resource)
+		APPLY_BQSR(BASE_RECALIBRATOR.out, interval_list, fasta)
+		SAMBAMBA_MARK_DUPLICATES(APPLY_BQSR.out) | set { ch_bam }
+
 		if( params.exome == false ) {
-			MOSDEPTH_WGS(ch_bam_filtered)
+			MOSDEPTH_WGS(ch_bam)
 		} else if( params.exome == false ) {
-			MOSDEPTH_EXOME(ch_bam_filtered)
+			MOSDEPTH_EXOME(ch_bam)
 		}
 	emit:
-		ch_bam_filtered
-		ch_checkpoint
+		ch_bam
 }
 
-workflow bam_checkpoint {
+workflow read_bam {
 	take:
 		ch_checkpoint
 	main:
 		Read_bam_checkpoint(ch_checkpoint)
 	emit:
-		ch_samples_checkpoint
+		ch_bam
 }
 
 workflow snv_call {
 	take:
-		ch_samples_checkpoint
+		ch_bam
 		fasta
 	main:
 		if( params.cohort_mode == false ) {
-			DEEP_VARIANT(ch_samples_checkpoint, fasta)
+			DEEP_VARIANT(ch_bam, fasta)
 			FILTER_SNVS(DEEP_VARIANT.out)
 			FILTER_SNVS.out | set { ch_snv_call }
 		} else {
-			DEEP_VARIANT(ch_samples_checkpoint, fasta)
+			DEEP_VARIANT(ch_bam, fasta)
 			FILTER_AND_MERGE_SNVS(DEEP_VARIANT.out.collect(), fasta)
 			FILTER_AND_MERGE_SNVS.out | set { ch_snv_call }
 		}
@@ -145,14 +129,14 @@ workflow snv_call {
 
 workflow sv_call {
 	take:
-		ch_samples_checkpoint
+		ch_bam
 		fasta
 	main:
 		if( params.exome == false ) {
-			MANTA_GERMLINE(ch_samples_checkpoint, fasta)
+			MANTA_GERMLINE(ch_bam, fasta)
 			MANTA_FILTER_VCF(MANTA_GERMLINE.out)
 		} else {
-			MANTA_EXOME_GERMLINE(ch_samples_checkpoint, fasta)
+			MANTA_EXOME_GERMLINE(ch_bam, fasta)
 			MANTA_FILTER_VCF(MANTA_EXOME_GERMLINE.out)
 		}
 		if( params.cohort_mode == false) {
@@ -192,24 +176,22 @@ workflow {
 
 		fastq_QC_workflow(preprocessing_workflow.out.ch_samples_initial)
 
-		if (params.bqsr == true) {
-			bqsr_mapping_workflow(fastq_QC_workflow.out.ch_fastp_results, 
+		if (params.bqsr == false) {
+			mapping_workflow(fastq_QC_workflow.out.ch_fastp_results, 
 						params.fasta, 
 						params.interval_list)
 
 		} else {
-			mapping_workflow(fastq_QC_workflow.out.ch_fastp_results, 
+			bqsr_mapping_workflow(fastq_QC_workflow.out.ch_fastp_results, 
 						params.fasta, 
 						params.interval_list, 
-						params.snv_resource, 
-						params.cnv_resource, 
-						params.sv_resource)
+						params.snv_resource)
 
 		}
 		
 	} else if(params.mode == "calling" ) {
 
-		bam_checkpoint(params.bam_samplesheet) | set { bam_input }
+		read_bam(params.bam_samplesheet) | set { bam_input }
 
 		snv_call(bam_input, 
 				 params.fasta)
@@ -222,31 +204,25 @@ workflow {
 	} else if(params.mode == "both" ) {
 
 		preprocessing_workflow(params.samplesheet)
-
 		fastq_QC_workflow(preprocessing_workflow.out.ch_samples_initial)
 
-		if (params.bqsr == true) {
+		if (params.bqsr == false) {
+			mapping_workflow(fastq_QC_workflow.out.ch_fastp_results, 
+						params.fasta, 
+						params.interval_list) | set { ch_bam }
+
+		} else {
 			bqsr_mapping_workflow(fastq_QC_workflow.out.ch_fastp_results, 
 						params.fasta, 
 						params.interval_list, 
-						params.snv_resource, 
-						params.cnv_resource, 
-						params.sv_resource)
-
-		} else {
-			mapping_workflow(fastq_QC_workflow.out.ch_fastp_results, 
-						params.fasta, 
-						params.interval_list, 
-						params.snv_resource, 
-						params.cnv_resource, 
-						params.sv_resource)
+						params.snv_resource) | set { ch_bam }
 
 		}
 
-		snv_call(mapping_workflow.out.ch_bam_filtered, 
+		snv_call(ch_bam, 
 				 params.fasta)
 
-		sv_call(bam_input, 
+		sv_call(ch_bam, 
 					params.fasta)
 
 		annotation_workflow(snv_call.out, sv_call.out, params.fasta)

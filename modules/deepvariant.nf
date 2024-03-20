@@ -17,7 +17,6 @@ process DEEP_VARIANT {
         --reads=${bam} \
         --output_vcf=${sample}_deepvariant.vcf.gz \
         --num_shards=${task.cpus} \
-		--parse_sam_aux_fields \
 		--use_original_quality_scores
 
 		"""
