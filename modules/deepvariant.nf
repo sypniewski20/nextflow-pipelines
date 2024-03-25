@@ -15,6 +15,7 @@ process DEEP_VARIANT {
         --model_type=WGS \
         --ref=${fasta}/${fasta}.fa \
         --reads=${bam} \
+		--regions=${params.contigs_bed} \
         --output_vcf=${sample}_deepvariant.vcf.gz \
         --num_shards=${task.cpus} 
 
@@ -31,7 +32,7 @@ process FILTER_SNVS {
 	input:
 		tuple val(sample), path(vcf)
 	output:
-		tuple val(sample), path("${sample}_deepvariant_filtered.vcf.gz"), path("${sample}_deepvariant_filtered.vcf.gz.tbi")
+		tuple path("${sample}_deepvariant_filtered.vcf.gz"), path("${sample}_deepvariant_filtered.vcf.gz.tbi")
 	script:
 		"""
 

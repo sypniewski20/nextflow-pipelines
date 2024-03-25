@@ -66,6 +66,26 @@ process MOSDEPTH_WGS {
 		tuple val(sample), path("${sample}*")
 	script:
 		"""
+
 		mosdepth -n --fast-mode --by 500  ${sample} ${bam} --threshold 1,10,20,30 -t ${task.cpus}
+
+		"""
+}
+
+process MOSDEPTH_EXOME {
+	publishDir "${params.outfolder}/${params.runID}/BAMQC", pattern: "*mosdepth*", mode: 'copy', overwrite: true
+	tag "${sample}"
+	label 'gatk'
+	label 'mem_16GB'
+	label 'core_4'
+	input:
+		tuple val(sample), path(bam), path(bai)
+	output:
+		tuple val(sample), path("${sample}*")
+	script:
+		"""
+
+		mosdepth --by ${params.contigs_bed} -n --fast-mode ${sample} ${bam} --threshold 1,10,20,30 -t ${task.cpus}
+
 		"""
 }

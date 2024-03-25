@@ -11,14 +11,12 @@ Output				:${params.outfolder}
 										References
 =================================================================================================================
 Fasta 				:${params.fasta}
-Intervals			:${params.interval_list}
-SNV					:${params.snv_resource}
 =================================================================================================================
 """
 .stripIndent()
 
 include { Read_samplesheet; Read_bam_checkpoint } from './modules/functions.nf'
-include { FASTQC_PROCESSING; FASTP_PROCESSING; MOSDEPTH_WGS} from './modules/seqQC.nf'
+include { FASTQC_PROCESSING; FASTP_PROCESSING; MOSDEPTH_WGS; MOSDEPTH_EXOME} from './modules/seqQC.nf'
 include { BWA_MAP_READS } from './modules/mapping.nf'
 include { BASE_RECALIBRATOR; APPLY_BQSR; BQSR_SPARK } from './modules/bqsr.nf'
 include { DEEP_VARIANT; FILTER_SNVS; FILTER_AND_MERGE_SNVS } from "./modules/deepvariant.nf"
@@ -64,7 +62,7 @@ workflow mapping_workflow {
 		
 		if( params.exome == false ) {
 			MOSDEPTH_WGS(ch_bam)
-		} else if( params.exome == false ) {
+		} else if( params.exome == true ) {
 			MOSDEPTH_EXOME(ch_bam)
 		}
 	emit:
@@ -89,7 +87,7 @@ workflow bqsr_mapping_workflow {
 
 		if( params.exome == false ) {
 			MOSDEPTH_WGS(ch_bam)
-		} else if( params.exome == false ) {
+		} else if( params.exome == true ) {
 			MOSDEPTH_EXOME(ch_bam)
 		}
 	emit:
@@ -158,7 +156,7 @@ workflow annotation_workflow {
 		ch_sv_output
 		fasta
 	main:
-		VEP(ch_snv_call, fasta)
+		// VEP(ch_snv_call, fasta)
 		ANNOT_SV(ch_sv_output)
 }
 

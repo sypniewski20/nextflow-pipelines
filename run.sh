@@ -1,5 +1,5 @@
 nextflow run main.nf -profile docker -resume \
-                     --mode mapping \
+                     --mode both \
                      --bqsr false \
                      --cohort_mode false \
                      --exome false \

@@ -1,4 +1,5 @@
 process BWA_MAP_READS {
+	publishDir "${params.outfolder}/${params.runID}/BAM", mode: 'copy', overwrite: true
 	tag "${sample}"
 	label 'gatk'
 	label 'mem_64GB'

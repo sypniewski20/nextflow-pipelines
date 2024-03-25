@@ -56,7 +56,7 @@ process MANTA_FILTER_VCF {
 	input:
 		tuple val(sample), path(manta)
 	output:
-		tuple val(sample), path("${sample}_manta_cnv_sorted.vcf.gz"), path("${sample}_manta_cnv_sorted.vcf.gz.tbi")
+		tuple path("${sample}_manta_cnv_sorted.vcf.gz"), path("${sample}_manta_cnv_sorted.vcf.gz.tbi")
 	script:
 		"""
             

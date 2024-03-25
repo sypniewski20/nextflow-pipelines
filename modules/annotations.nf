@@ -8,7 +8,10 @@ process ANNOT_SV {
 	script:
 		"""
 
-		AnnotSV -SVinputFile ${vcf} -genomeBuild ${params.genome} -outputFile annotated_${vcf} -outputDir .
+		AnnotSV -SVinputFile ${vcf} \
+                -genomeBuild ${params.genome} \
+                -outputFile annotated_${vcf} \
+                -outputDir .
 
 		"""
 }	
@@ -19,7 +22,7 @@ process VEP {
 	label 'mem_64GB'
 	label 'core_36'
 	input:
-		path(vcf)
+		tuple file(vcf), file(tbi)
 		path(fasta)
 	output:
 		path("${vcf}.vep.tsv.gz")
@@ -28,7 +31,7 @@ process VEP {
 
         vep \
         --cache \
-        --dir_cache /scratch/references/vep_cache \
+        --dir_cache ${params.vep_cache} \
         --species homo_sapiens \
         --fasta ${fasta}/${fasta}.fa \
         --assembly ${params.genome} \
