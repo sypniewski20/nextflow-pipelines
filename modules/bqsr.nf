@@ -6,25 +6,28 @@ process BASE_RECALIBRATOR {
 	input:
 		tuple val(sample), path(bam), path(bai)
 		path(fasta)
+    	path(fasta_fai)
+		path(fasta_dict)
 		path(interval_list)
-		tuple path(snv_resource), path("${snv_resource}.tbi") 
+		path(snv_resource)
+		path(snv_tbi) 
 	output:
 		tuple val(sample), path("${bam}"), path("${sample}_recal_data.table")
 	script:
 		"""
-			
-		ln -sf \$( echo "\$( realpath ${snv_resource} ).tbi" ) .
-			
+						
 		gatk BaseRecalibrator \
 		-I ${bam} \
-		-R ${fasta}/${fasta}.fa \
+		-R ${fasta} \
 		-L ${interval_list} \
 		--known-sites ${snv_resource} \
 		-O ${sample}_recal_data.table
+
 		"""
 }
 
 process APPLY_BQSR {
+	publishDir "${params.outfolder}/${params.runID}/BAM", mode: 'copy', overwrite: false
 	tag "${sample}"
 	label 'gatk'
 	label 'mem_16GB'
@@ -33,13 +36,15 @@ process APPLY_BQSR {
 		tuple val(sample), path(bam), path(recal_table)
 		path(interval_list)
 		path(fasta)
+    	path(fasta_fai)
+		path(fasta_dict)
 	output:
 		tuple val(sample), path("${sample}_recal.bam"), path("${sample}_recal.bam.bai")
 	script:
 		"""
 
 		gatk ApplyBQSR \
-		-R ${fasta}/${fasta}.fa \
+		-R ${fasta} \
 		-L ${interval_list} \
 		-I ${bam} \
 		--bqsr-recal-file ${recal_table} \
@@ -54,21 +59,22 @@ process APPLY_BQSR {
 }
 
 process BQSR_SPARK  {
+	publishDir "${params.outfolder}/${params.runID}/BAM", mode: 'copy', overwrite: false
 	tag "${sample}"
 	label 'gatk'
-	label 'mem_256GB'
-	label 'core_64'
+	label 'mem_64GB'
+	label 'core_36'
 	input:
 		tuple val(sample), path(bam), path(bai)
 		path(fasta)
+		path(fasta_img)
 		path(interval_list)
 		path(snv_resource)
+		path(snv_tbi)
 	output:
 		tuple val(sample), path("${sample}_sorted_markdup_recal.bam"), path("${sample}_sorted_markdup_recal.bam.bai")
 	script:
 		"""
-
-		ln -sf \$( echo "\$( realpath ${snv_resource} ).tbi" ) .
 
 		gatk CreateHadoopBamSplittingIndex \
 			--create-bai \
@@ -80,7 +86,7 @@ process BQSR_SPARK  {
 		--tmp-dir ${params.spark_tmp} \
 		-L ${interval_list} \
 		-I ${bam} \
-		-R ${fasta}/${fasta}.fa \
+		-R ${fasta} \
 		--known-sites ${snv_resource} \
 		-O ${sample}_sorted_markdup_recal.bam
 

@@ -6,6 +6,9 @@ process MANTA_GERMLINE {
 	input:
 		tuple val(sample), path(bam), path(bai)
 		path(fasta)
+		path(fasta_fai)
+		path(contigs)
+		path(contigs_tbi)
 	output:
 		tuple val(sample), path("manta/results/variants/diploidSV.vcf.gz")
 	script:
@@ -13,9 +16,9 @@ process MANTA_GERMLINE {
             
         /manta/bin/configManta.py \
 		--bam ${bam} \
-		--referenceFasta ${fasta}/${fasta}.fa \
+		--referenceFasta ${fasta} \
 		--runDir manta \
-		--callRegions ${params.contigs_bed}
+		--callRegions ${contigs}
 
 		manta/runWorkflow.py -j ${task.cpus}
 
@@ -30,6 +33,9 @@ process MANTA_EXOME_GERMLINE {
 	input:
 		tuple val(sample), path(bam), path(bai)
 		path(fasta)
+		path(fasta_fai)
+		path(contigs)
+		path(contigs_tbi)
 	output:
 		tuple val(sample), path("manta/results/variants/diploidSV.vcf.gz")
 	script:
@@ -37,10 +43,10 @@ process MANTA_EXOME_GERMLINE {
             
         /manta/bin/configManta.py \
 		--bam ${bam} \
-		--referenceFasta ${fasta}/${fasta}.fa \
+		--referenceFasta ${fasta} \
 		--runDir manta \
 		--exome \
-		--callRegions ${params.contigs_bed}
+		--callRegions ${contigs}
 
 		manta/runWorkflow.py -j ${task.cpus}
 
@@ -48,7 +54,7 @@ process MANTA_EXOME_GERMLINE {
 }
 
 process MANTA_FILTER_VCF {
-	publishDir "${params.outfolder}/${params.runID}/SV", mode: 'copy', overwrite: true
+	publishDir "${params.outfolder}/${params.runID}/SV/manta", mode: 'copy', overwrite: true
 	tag "${sample}"
 	label 'gatk'
 	label 'mem_8GB'
@@ -60,9 +66,8 @@ process MANTA_FILTER_VCF {
 	script:
 		"""
             
-		bcftools sort ${manta} -Ov | \
-		bcftools filter -e INFO/IMPRECISE=1 -Ov | \
-		bcftools view -f PASS --threads ${task.cpus} -Oz -o ${sample}_manta_cnv_sorted.vcf.gz
+		bcftools view -f PASS --threads ${task.cpus} ${manta} -Ou | \
+		bcftools sort -Oz -o ${sample}_manta_cnv_sorted.vcf.gz
 
 		tabix -p vcf ${sample}_manta_cnv_sorted.vcf.gz
 
@@ -70,7 +75,7 @@ process MANTA_FILTER_VCF {
 }
 
 process MANTA_MERGE_VCF {
-	publishDir "${params.outfolder}/${params.runID}/SV", mode: 'copy', overwrite: true
+	publishDir "${params.outfolder}/${params.runID}/SV/manta", mode: 'copy', overwrite: true
 	label 'gatk'
 	label 'mem_8GB'
 	label 'core_4'

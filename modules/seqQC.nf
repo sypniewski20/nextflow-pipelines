@@ -20,8 +20,8 @@ process FASTQC_PROCESSING {
 	publishDir "${params.outfolder}/${params.runID}/fastQC", pattern: "fastqc_${sample}_logs/*", mode: 'copy', overwrite: true
 	label 'gatk'
 	tag "${sample}"
-	label 'mem_16GB'
-	label 'core_8'
+	label 'mem_8GB'
+	label 'core_4'
 	input:
 		tuple val(sample), file(read_1), file(read_2)
 	output:
@@ -55,10 +55,10 @@ process FASTP_PROCESSING {
 }
 
 process MOSDEPTH_WGS {
-	publishDir "${params.outfolder}/${params.runID}/BAMQC", pattern: "*mosdepth*", mode: 'copy', overwrite: true
+	publishDir "${params.outfolder}/${params.runID}/BAMQC", mode: 'copy', overwrite: true
 	tag "${sample}"
 	label 'gatk'
-	label 'mem_16GB'
+	label 'mem_4GB'
 	label 'core_4'
 	input:
 		tuple val(sample), path(bam), path(bai)

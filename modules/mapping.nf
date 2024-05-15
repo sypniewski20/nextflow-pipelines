@@ -2,11 +2,17 @@ process BWA_MAP_READS {
 	publishDir "${params.outfolder}/${params.runID}/BAM", mode: 'copy', overwrite: true
 	tag "${sample}"
 	label 'gatk'
-	label 'mem_64GB'
-	label 'core_36'
+	label 'mem_96GB'
+	label 'core_24'
 	input:
 		tuple val(sample), path(read_1), path(read_2)
 		path(fasta)
+    	path(fasta_fai)
+    	path(fasta_sa)
+    	path(fasta_bwt)
+    	path(fasta_ann)
+    	path(fasta_amb)
+    	path(fasta_pac)
 	output:
 		tuple val(sample), path("${sample}_markdups.bam"), path("${sample}_markdups.bam.bai")
 	script:
@@ -21,16 +27,16 @@ process BWA_MAP_READS {
 
 		bwa mem -t ${task.cpus} \
 			-R \${tags} \
-			${fasta}/${fasta}.fa \
+			${fasta} \
 			${read_1} \
 			${read_2} | \
 		samblaster | \
-		samtools view --reference ${fasta}/${fasta}.fa \
+		samtools view --reference ${fasta} \
 					  --threads ${task.cpus} \
 					  -b | \
 		samtools sort -@ ${task.cpus} \
 					  -O bam \
-					  --reference ${fasta}/${fasta}.fa >  ${sample}_markdups.bam
+					  --reference ${fasta} >  ${sample}_markdups.bam
 
 		sambamba index --nthreads ${task.cpus} ${sample}_markdups.bam
 
@@ -41,13 +47,22 @@ process BWA_MAP_READS {
 }
 
 process BWAMEM2_MAP_READS {
+	publishDir "${params.outfolder}/${params.runID}/BAM", mode: 'copy', overwrite: false
 	tag "${sample}"
 	label 'gatk'
-	label 'mem_64GB'
-	label 'core_36'
+	label 'mem_96GB'
+	label 'core_24'
 	input:
 		tuple val(sample), path(read_1), path(read_2)
 		path(fasta)
+    	path(fasta_fai)
+    	path(fasta_sa)
+    	path(fasta_bwt)
+    	path(fasta_ann)
+    	path(fasta_amb)
+    	path(fasta_pac)
+		path(fasta_0123)
+		path(fasta_2bit)
 	output:
 		tuple val(sample), path("${sample}_markdups.bam"), path("${sample}_markdups.bam.bai")
 	script:
@@ -62,16 +77,16 @@ process BWAMEM2_MAP_READS {
 
 		bwa-mem2 mem -t ${task.cpus} \
 			-R \${tags} \
-			${fasta}/${fasta}.fa \
+			${fasta} \
 			${read_1} \
 			${read_2} | \
 		samblaster | \
-		samtools view --reference ${fasta}/${fasta}.fa \
+		samtools view --reference ${fasta} \
 					  --threads ${task.cpus} \
 					  -b | \
 		samtools sort -@ ${task.cpus} \
 					  -O bam \
-					  --reference ${fasta}/${fasta}.fa >  ${sample}_markdups.bam
+					  --reference ${fasta} >  ${sample}_markdups.bam
 
 		sambamba index --nthreads ${task.cpus} ${sample}_markdups.bam
 
@@ -81,36 +96,3 @@ process BWAMEM2_MAP_READS {
 
 		"""
 }
-
-process SAMBAMBA_MARK_DUPLICATES {
-	publishDir "${params.outfolder}/${params.runID}/BAMQC", pattern: "${sample}.dup_metrics.*", mode: 'copy', overwrite: true
-	publishDir "${params.outfolder}/${params.runID}/BAM", pattern: "${sample}_dupfiltered.*", mode: 'copy', overwrite: true
-	tag "${sample}"
-	label 'gatk'
-	label 'mem_16GB'
-	label 'core_8'
-	input:
-		tuple val(sample), path(bam), path(bai)
-	output:
-		tuple val(sample),  path("${sample}_dupfiltered.bam"), path("${sample}_dupfiltered.bam.bai")
-	script:
-		"""
-
-		sambamba markdup \
-			--nthreads ${task.cpus} \
-			${bam} \
-			${sample}_dupfiltered.bam
-		
-		sambamba index --nthreads ${task.cpus} ${sample}_dupfiltered.bam
-
-		if \$( sambamba flagstat --nthreads ${task.cpus} ${sample}_dupfiltered.bam | grep -q "^0 + 0 in total (QC-passed reads + QC-failed reads)\$" ); then
-        	echo "${sample}_dupfiltered.bam is empty"
-			exit 1
-		fi
-
-		gatk ValidateSamFile -I ${sample}_dupfiltered.bam \
-							 -M SUMMARY
-		
-		"""
-}
-

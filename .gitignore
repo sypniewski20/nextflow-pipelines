@@ -1,4 +1,3 @@
-work
 .nextflow 
 .nextflow.log 
 .nextflow.log.1 
@@ -10,4 +9,17 @@ work
 .nextflow.log.7 
 .nextflow.log.8 
 .nextflow.log.9
-pipeline_info
+work
+workflows/work
+workflows/.nextflow 
+workflows/.nextflow.log 
+workflows/.nextflow.log.1 
+workflows/.nextflow.log.2 
+workflows/.nextflow.log.3 
+workflows/.nextflow.log.4 
+workflows/.nextflow.log.5 
+workflows/.nextflow.log.6 
+workflows/.nextflow.log.7 
+workflows/.nextflow.log.8 
+workflows/.nextflow.log.9
+workflows/pipeline_info
