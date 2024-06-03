@@ -1,20 +1,54 @@
-process CHECK_INTEGRITY {
-	label 'gatk'
+process UBAM {
 	tag "${sample}"
+	label 'gatk'
 	label 'mem_16GB'
-	label 'core_8'
+	label 'core_4'
 	input:
-		tuple val(sample),  file(read_1), file(read_2)
+		tuple val(sample), path(bam), path(bai)
 	output:
-		tuple val(sample),  file("${read_1}"), file("${read_2}")
+		tuple val(sample), path("${sample}_ubam.bam")
 	script:
-	"""
+		"""
 
-	bgzip -@ ${task.cpus} -t ${read_1}
-	bgzip -@ ${task.cpus} -t ${read_2}
+		gatk RevertSam \
+		I=${bam} \
+		O=${sample}_ubam.bam \
+		SANITIZE=true \
+		ATTRIBUTE_TO_CLEAR=XT \
+		ATTRIBUTE_TO_CLEAR=XN \
+		ATTRIBUTE_TO_CLEAR=AS \
+		ATTRIBUTE_TO_CLEAR=OC \
+		ATTRIBUTE_TO_CLEAR=OP \
+		SORT_ORDER=queryname \
+		RESTORE_ORIGINAL_QUALITIES=true \
+		REMOVE_DUPLICATE_INFORMATION=true \
+		REMOVE_ALIGNMENT_INFORMATION=true \
+		MAX_DISCARD_FRACTION=0.15
 
-	"""
+		"""
 }
+
+process BAM2FASTQ {
+	tag "${sample}"
+	label 'gatk'
+	label 'mem_16GB'
+	label 'core_4'
+	input:
+		tuple val(sample), path(bam)
+	output:
+		tuple val(sample), path("${sample}_1.fq.gz"), path("${sample}_2.fq.gz")
+	script:
+		"""
+
+		gatk SamToFastq \
+			NON_PF=true \
+			I=${bam} \
+			FASTQ=${sample}_1.fq.gz \
+			F2=${sample}_2.fq.gz
+ 
+
+		"""
+}	
 
 process FASTQC_PROCESSING {
 	publishDir "${params.outfolder}/${params.runID}/fastQC", pattern: "fastqc_${sample}_logs/*", mode: 'copy', overwrite: true

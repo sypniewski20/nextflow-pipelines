@@ -18,8 +18,8 @@ include { Read_samplesheet; Read_bam_checkpoint } from '../modules/functions.nf'
 include { FASTQC_PROCESSING; FASTP_PROCESSING; MOSDEPTH_WGS; MOSDEPTH_EXOME} from '../modules/seqQC.nf'
 include { BWA_MAP_READS; BWAMEM2_MAP_READS } from '../modules/mapping.nf'
 include { BASE_RECALIBRATOR; APPLY_BQSR; BQSR_SPARK } from '../modules/bqsr.nf'
-include { DEEP_VARIANT_WGS; DEEP_VARIANT_WES; FILTER_SNVS; FILTER_AND_MERGE_SNVS } from "../modules/deepvariant.nf"
-include { MANTA_GERMLINE; MANTA_EXOME_GERMLINE; MANTA_FILTER_VCF; MANTA_MERGE_VCF } from "../modules/manta.nf"
+include { DEEP_VARIANT_WGS; DEEP_VARIANT_WES; FILTER_SNVS } from "../modules/deepvariant.nf"
+include { MANTA_GERMLINE; MANTA_EXOME_GERMLINE; MANTA_FILTER_VCF } from "../modules/manta.nf"
 include { SMOOVE; SMOOVE_ANNOTATE } from "../modules/smoove.nf"
 include { DELLY_SV_CALL; DELLY_CNV_CALL; FILTER_DELLY; DELLY_MERGE_SITES; DELLY_MERGED_SITES_CALL } from "../modules/delly.nf"
 include { VEP_SNV; VEP_SV; ANNOT_SV; SURVIVOR } from "../modules/annotations.nf"
@@ -160,17 +160,20 @@ workflow snv_call {
 	take:
 		ch_bam
 		fasta
+		contigs_bed
 	main:
 		fasta_fai = file(fasta+'.fai')
 		if( params.exome == false ) {
 			DEEP_VARIANT_WGS(ch_bam, 
 							fasta,
-							fasta_fai)
+							fasta_fai,
+							contigs_bed)
 			FILTER_SNVS(DEEP_VARIANT_WGS.out, fasta)
 		} else {
 			DEEP_VARIANT_WES(ch_bam, 
 							fasta,
-							fasta_fai)
+							fasta_fai,
+							contigs_bed)
 			FILTER_SNVS(DEEP_VARIANT_WES.out, fasta)
 		}
 	VEP_SNV(FILTER_SNVS.out, fasta, fasta_fai)
@@ -180,23 +183,23 @@ workflow sv_manta {
 	take:
 		ch_bam
 		fasta
-		contigs
+		contigs_bed
 	main:
 		fasta_fai = file(fasta+'.fai')
-		contigs_tbi = file(contigs+".tbi")
+		contigs_tbi = file(contigs_bed+".tbi")
 
 		if( params.exome == false ) {
 			MANTA_GERMLINE(ch_bam, 
 						   fasta, 
 						   fasta_fai, 
-						   contigs, 
+						   contigs_bed, 
 						   contigs_tbi)
 			MANTA_FILTER_VCF(MANTA_GERMLINE.out)
 		} else {
 			MANTA_EXOME_GERMLINE(ch_bam, 
 								 fasta, 
 								 fasta_fai,
-								 contigs,
+								 contigs_bed,
 								 contigs_tbi)
 			MANTA_FILTER_VCF(MANTA_EXOME_GERMLINE.out)
 		}	
@@ -209,14 +212,14 @@ workflow sv_delly {
 	take:
 		ch_bam
 		fasta
-		centromeres
+		contigs_bed
 		delly_map
 	main:
 		fasta_fai = file(fasta+'.fai')
 		DELLY_SV_CALL(ch_bam, 
 						fasta, 
 						fasta_fai, 
-						centromeres)
+						contigs_bed)
 		FILTER_DELLY(DELLY_SV_CALL.out) | set {delly_sv}
 	emit:
 		delly_sv
@@ -243,7 +246,6 @@ workflow survivor {
 		fasta_fai = file(fasta+'.fai')
 		SURVIVOR(manta_sv, delly_sv, smoove_sv)
 		ANNOT_SV(SURVIVOR.out)
-		// VEP_SV(SURVIVOR.out, fasta, fasta_fai)
 
 }
 
@@ -293,15 +295,16 @@ workflow {
 					params.fasta) | set { ch_bam }
 
 		snv_call(ch_bam, 
-				 params.fasta)
+				 params.fasta,
+				 params.contigs_bed)
 
 		sv_manta(ch_bam, 
 				params.fasta,
-				params.contigs)
+				params.contigs_bed)
 
 		sv_delly(ch_bam, 
 				params.fasta,
-				params.centromeres,
+				params.contigs_bed,
 				params.delly_map)
 
 		sv_smoove(ch_bam,

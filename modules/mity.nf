@@ -12,31 +12,28 @@ process GET_MT {
 		"""
 
         samtools view ${bam} chrMT -bo ${sample}_mt.temp.bam
-
         samtools view -H ${sample}_mt.temp.bam | sed 's/chrMT/chrM/g' > new_header.sam
-
         samtools reheader new_header.sam ${sample}_mt.temp.bam > ${sample}_mt.bam
-
 		sambamba index --nthreads ${task.cpus} ${sample}_mt.bam
 
 		"""
 }
 
 process MT_CALL {
-    publishDir "${params.outfolder}/${params.runID}/MT/", mode: 'copy', overwrite: false
-    tag "${sample}"
+    publishDir "${params.outfolder}/${params.runID}/SNV/mity", mode: 'copy', overwrite: true
     label 'mity'
 	label 'mem_16GB'
 	label 'core_1'
 	input:
-		tuple val(sample), path(bam), path(bai)
+		path(bam)
+		path(bai)
 	output:
-		tuple val(sample), path("${sample}_mity.vcf.gz")
+		path("mity.vcf.gz")
 	script:
 		"""
 
         call \
-        --prefix ${sample} \
+        --prefix mity \
         --output-dir . \
         --normalise \
 		--reference hg38 \
@@ -47,23 +44,44 @@ process MT_CALL {
 }
 
 process MT_REPORT {
-    publishDir "${params.outfolder}/${params.runID}/MT/", mode: 'copy', overwrite: false
-    tag "${sample}"
+    publishDir "${params.outfolder}/${params.runID}/SNV/mity", mode: 'copy', overwrite: true
     label 'mity'
 	label 'mem_16GB'
 	label 'core_1'
 	input:
-		tuple val(sample), path(vcf)
+		path(vcf)
 	output:
-		tuple path("${sample}.annotated_variants.csv"), path("${sample}.annotated_variants.xlsx")
+		tuple path("mity.annotated_variants.csv"), path("mity.annotated_variants.xlsx")
 	script:
 		"""
 
         report \
-        --prefix ${sample} \
+        --prefix mity \
         --min_vaf 0.01 \
         --output-dir . \
         ${vcf}
+
+		"""
+
+}
+
+process MT_MERGE {
+    publishDir "${params.outfolder}/${params.runID}/SNV/", mode: 'copy', overwrite: true
+    label 'mity'
+	label 'mem_16GB'
+	label 'core_1'
+	input:
+		path(mity_vcf)
+		path(nuclear_vcf)
+	output:
+		tuple path("mity.annotated_variants.csv"), path("mity.annotated_variants.xlsx")
+	script:
+		"""
+
+		merge \
+		--prefix multisample \
+		--mity_vcf ${mity_vcf} \
+		--nuclear_vcf ${nuclear_vcf}
 
 		"""
 

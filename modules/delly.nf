@@ -7,7 +7,7 @@ process DELLY_SV_CALL {
 		tuple val(sample), path(bam), path(bai)
 		path(fasta)
 		path(fasta_fai)
-		path(centromeres)
+		path(contigs_bed)
 	output:
 		tuple val(sample), path("${sample}_delly_sv.vcf")
 	script:
@@ -15,7 +15,7 @@ process DELLY_SV_CALL {
 
         delly call \
 			  -g ${fasta} \
-     		  -x ${centromeres} \
+     		  -x ${contigs_bed} \
 			  ${bam} > ${sample}_delly_sv.vcf
 
 		"""
@@ -96,7 +96,7 @@ process DELLY_MERGED_SITES_CALL {
 	input:
 		tuple val(sample), path(bam), path(bai)
 		file(fasta)
-		path(centromeres)
+		path(contigs_bed)
 		path(sites)
 	output:
 		tuple val(sample), path("${sample}_delly_joint.vcf")
@@ -105,7 +105,7 @@ process DELLY_MERGED_SITES_CALL {
 
         delly call \
 			  -v ${sites} \
-			  -x ${centromeres} \
+			  -x ${contigs_bed} \
 			  -g ${fasta}/${fasta}.fa \
 			  -o ${sample}_delly_joint.vcf
 			  ${bam} 

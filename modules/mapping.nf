@@ -18,12 +18,7 @@ process BWA_MAP_READS {
 	script:
 		"""
 
-		READ_GROUP_NAME=\$( zgrep @ ${read_1} | \
-					head -n 1 | \
-					cut -d :  -f1 | \
-					sed 's/@//g' )
-
-		tags=\$(echo "@RG\\tID:\${READ_GROUP_NAME}\\tSM:${sample}\\tPL:ILLUMINA\\tLB:lb1")
+		tags=\$(echo "@RG\\tID:${sample}\\tSM:${sample}\\tPL:ILLUMINA\\tLB:lb1")
 
 		bwa mem -t ${task.cpus} \
 			-R \${tags} \
@@ -47,7 +42,7 @@ process BWA_MAP_READS {
 }
 
 process BWAMEM2_MAP_READS {
-	publishDir "${params.outfolder}/${params.runID}/BAM", mode: 'copy', overwrite: false
+	publishDir "${params.outfolder}/${params.runID}/BAM", mode: 'copy', overwrite: true
 	tag "${sample}"
 	label 'gatk'
 	label 'mem_96GB'
@@ -68,12 +63,7 @@ process BWAMEM2_MAP_READS {
 	script:
 		"""
 
-		READ_GROUP_NAME=\$( zgrep @ ${read_1} | \
-					head -n 1 | \
-					cut -d :  -f1 | \
-					sed 's/@//g' )
-
-		tags=\$(echo "@RG\\tID:\${READ_GROUP_NAME}\\tSM:${sample}\\tPL:ILLUMINA\\tLB:lb1")
+		tags=\$(echo "@RG\\tID:${sample}\\tSM:${sample}\\tPL:ILLUMINA\\tLB:lb1")
 
 		bwa-mem2 mem -t ${task.cpus} \
 			-R \${tags} \
@@ -81,15 +71,10 @@ process BWAMEM2_MAP_READS {
 			${read_1} \
 			${read_2} | \
 		samblaster | \
-		samtools view --reference ${fasta} \
-					  --threads ${task.cpus} \
-					  -b | \
 		samtools sort -@ ${task.cpus} \
-					  -O bam \
-					  --reference ${fasta} >  ${sample}_markdups.bam
+					  -o ${sample}_markdups.bam
 
 		sambamba index --nthreads ${task.cpus} ${sample}_markdups.bam
-
 
 		gatk ValidateSamFile -I  ${sample}_markdups.bam \
 							 -MODE	SUMMARY

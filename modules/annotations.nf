@@ -1,8 +1,9 @@
 process ANNOT_SV {
     publishDir "${params.outfolder}/${params.runID}/SV", mode: 'copy', overwrite: true
+    tag "${sample}"
 	label 'annotsv'
 	input:
-		tuple file(vcf), file(tbi)
+		tuple val(sample), file(vcf), file(tbi)
 	output:
 		path("annotated_${vcf}.tsv")
 	script:
@@ -16,7 +17,7 @@ process ANNOT_SV {
 		"""
 }	
 
-process VEP {
+process VEP_SNV {
     publishDir "${params.outfolder}/${params.runID}/SNV/", mode: 'copy', overwrite: true
     label 'vep'
 	label 'mem_64GB'
@@ -45,8 +46,10 @@ process VEP {
         --fork ${task.cpus} \
         --force_overwrite \
         --e \
-        --custom file=${params.clinvar},short_name=ClinVar,format=vcf,type=exact,coords=0,fields=CLNSIG%CLNREVSTAT%CLNDN \
-        --plugin REVEL,file=${params.REVEL}
+        --custom file=${params.clinvar},short_name=ClinVar,format=vcf,type=exact,coords=0,fields=CLNSIG%CLNREVSTAT%CLNDN%MC%CLNDISDB%CLNDISDBINC \
+        --plugin REVEL,file=${params.REVEL} \
+        --custom file=/data/references/germline_resource/gnomAD4/gnomad_snv_v4.0_complete.vcf.gz,short_name=gnomADg4,format=vcf,type=exact,coords=0,fields=AF_joint
+
 
 
 		"""
@@ -115,25 +118,6 @@ process SURVIVOR {
 
         bcftools sort ${sample}_survivor_merged.vcf -Oz -o ${sample}_survivor_merged.vcf.gz
         tabix -p vcf ${sample}_survivor_merged.vcf.gz
-
-		"""
-}
-
-process ANNOT_SV {
-    publishDir "${params.outfolder}/${params.runID}/SV", mode: 'copy', overwrite: true
-    tag "${sample}"
-	label 'annotsv'
-	input:
-		tuple val(sample), file(vcf), file(tbi)
-	output:
-		path("annotated_${vcf}.tsv")
-	script:
-		"""
-
-		AnnotSV -SVinputFile ${vcf} \
-                -genomeBuild ${params.genome} \
-                -outputFile annotated_${vcf} \
-                -outputDir .
 
 		"""
 }

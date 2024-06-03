@@ -7,8 +7,8 @@ process MANTA_GERMLINE {
 		tuple val(sample), path(bam), path(bai)
 		path(fasta)
 		path(fasta_fai)
-		path(contigs)
-		path(contigs_tbi)
+		path(contigs_bed)
+		path(contigs_bed_tbi)
 	output:
 		tuple val(sample), path("manta/results/variants/diploidSV.vcf.gz")
 	script:
@@ -18,7 +18,7 @@ process MANTA_GERMLINE {
 		--bam ${bam} \
 		--referenceFasta ${fasta} \
 		--runDir manta \
-		--callRegions ${contigs}
+		--callRegions ${contigs_bed}
 
 		manta/runWorkflow.py -j ${task.cpus}
 
@@ -34,8 +34,8 @@ process MANTA_EXOME_GERMLINE {
 		tuple val(sample), path(bam), path(bai)
 		path(fasta)
 		path(fasta_fai)
-		path(contigs)
-		path(contigs_tbi)
+		path(contigs_bed)
+		path(contigs_bed_tbi)
 	output:
 		tuple val(sample), path("manta/results/variants/diploidSV.vcf.gz")
 	script:
@@ -46,7 +46,60 @@ process MANTA_EXOME_GERMLINE {
 		--referenceFasta ${fasta} \
 		--runDir manta \
 		--exome \
-		--callRegions ${contigs}
+		--callRegions ${contigs_bed}
+
+		manta/runWorkflow.py -j ${task.cpus}
+
+		"""
+}
+
+process MANTA_WES_JOINT {
+	publishDir "${params.outfolder}/${params.runID}/SV/manta", mode: 'copy', overwrite: true
+	label 'manta'
+	label 'mem_8GB'
+	label 'core_18'
+	input:
+		path(bam)
+		path(fasta)
+		path(fasta_fai)
+		path(contigs_bed)
+	output:
+		path("manta/results/variants/diploidSV.vcf.gz")
+	script:
+		"""
+            
+        /manta/bin/configManta.py \
+		--bam ${bam} \
+		--referenceFasta ${fasta} \
+		--runDir manta \
+		--exome \
+		--callRegions ${contigs_bed}
+
+		/manta/runWorkflow.py -j ${task.cpus}
+
+		"""
+}
+
+process MANTA_WGS_JOINT {
+	publishDir "${params.outfolder}/${params.runID}/SV/manta", mode: 'copy', overwrite: true
+	label 'manta'
+	label 'mem_8GB'
+	label 'core_18'
+	input:
+		path(bam)
+		path(fasta)
+		path(fasta_fai)
+		path(contigs_bed)
+	output:
+		path("manta/results/variants/diploidSV.vcf.gz")
+	script:
+		"""
+            
+        /manta/bin/configManta.py \
+		--bam ${bam} \
+		--referenceFasta ${fasta} \
+		--runDir manta \
+		--callRegions ${contigs_bed}
 
 		manta/runWorkflow.py -j ${task.cpus}
 
@@ -71,26 +124,5 @@ process MANTA_FILTER_VCF {
 
 		tabix -p vcf ${sample}_manta_cnv_sorted.vcf.gz
 
-		"""
-}
-
-process MANTA_MERGE_VCF {
-	publishDir "${params.outfolder}/${params.runID}/SV/manta", mode: 'copy', overwrite: true
-	label 'gatk'
-	label 'mem_8GB'
-	label 'core_4'
-	input:
-		path(vcf)
-		path(tbi)
-	output:
-		tuple path("multisample_manta_cnv_sorted.vcf.gz"), path("multisample_manta_cnv_sorted.vcf.gz.tbi")
-	script:
-		"""
-            
-		bcftools merge --missing-to-ref ${vcf} -Ov | \
-		bcftools sort -Oz -o multisample_manta_cnv_sorted.vcf.gz
-
-		tabix -p vcf multisample_manta_cnv_sorted.vcf.gz
-		
 		"""
 }

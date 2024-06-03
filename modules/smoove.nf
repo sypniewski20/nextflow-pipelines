@@ -72,27 +72,28 @@ process SMOOVE_MERGE {
 
 process SMOOVE_JOINT_GENOTYPE {
 	publishDir "${params.outfolder}/${params.runID}/SV/smoove", mode: 'copy', overwrite: true
-	tag "${sample}"
 	label 'smoove'
-	label 'mem_8GB'
+	label 'mem_16GB'
 	label 'core_1'
 	input:
-		tuple val(sample), path(bam), path(bai)
+		path(bam)
+		path(bai)
 		path(fasta)
+		path(exclude_bed)
 	output:
-		tuple val(sample), path("${sample}-smoove.genotyped.vcf.gz"), path("${sample}-smoove.genotyped.vcf.gz.tbi")
+		tuple path("multisample-smoove.genotyped.vcf.gz"), path("multisample-smoove.genotyped.vcf.gz.tbi")
 	script:
 		"""
             
-        smoove genotype -x \
-					-duphold \
-					--genotype \
-                    --name ${sample} \
-                    --exclude /data/references/bed/GRCh38/exclude.cnvnator_100bp.GRCh38.20170403.bed \
-                    --fasta ${fasta}/${fasta}.fa \
-                    -p ${task.cpus} \
-					--outdir . \
-					${bam}
+		smoove call -x \
+					--name multisample \
+					--exclude ${exclude_bed} \
+					--fasta ${fasta} \
+					-p ${task.cpus} \
+					--genotype ${bam}
+
+		tabix -p vcf multisample-smoove.genotyped.vcf.gz
+
 
 		"""
 }
