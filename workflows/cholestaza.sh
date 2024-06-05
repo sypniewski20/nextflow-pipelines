@@ -4,7 +4,7 @@ nextflow run trios.nf \
         --mode "all" \
 	    --remap true \
 	    --bwa 2 \
- 	    --runID "bwa2" \
+ 	    --runID "GRCh38" \
 	    --exome true \
 	    --samplesheet "/home/mateuszsypniewski/cholestaza/manifest_bam.csv" \
         --ped "/home/mateuszsypniewski/cholestaza/samples.ped" \
@@ -17,4 +17,6 @@ nextflow run trios.nf \
         --vep_cache "/data/references/vep" \
         --clinvar "/data/references/clinvar/GRCh38/clinvar_20240520.vcf.gz" \
         --REVEL "/data/references/germline_resource/REVEL/new_tabbed_revel_grch38.tsv.gz" \
-        --genome "GRCh38"
+		--CADD "/data/references/germline_resource/CADD/whole_genome_SNVs.tsv.gz" \
+        --genome "GRCh38" \
+		--mity_genome "hg38"

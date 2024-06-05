@@ -36,7 +36,7 @@ process MT_CALL {
         --prefix mity \
         --output-dir . \
         --normalise \
-		--reference hg38 \
+		--reference ${params.mity_genome} \
         ${bam}
 
 		"""

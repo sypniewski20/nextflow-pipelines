@@ -35,7 +35,6 @@ process VEP_SNV {
         --cache \
         --dir_cache ${params.vep_cache} \
         --species homo_sapiens \
-        --fasta ${fasta} \
         --assembly ${params.genome} \
         --buffer_size 1000000 \
         -i ${vcf} \
@@ -48,7 +47,10 @@ process VEP_SNV {
         --e \
         --custom file=${params.clinvar},short_name=ClinVar,format=vcf,type=exact,coords=0,fields=CLNSIG%CLNREVSTAT%CLNDN%MC%CLNDISDB%CLNDISDBINC \
         --plugin REVEL,file=${params.REVEL} \
+        --plugin CADD,file=${params.CADD} \
         --custom file=/data/references/germline_resource/gnomAD4/gnomad_snv_v4.0_complete.vcf.gz,short_name=gnomADg4,format=vcf,type=exact,coords=0,fields=AF_joint
+        
+
 
 
 

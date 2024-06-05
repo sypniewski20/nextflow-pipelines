@@ -17,7 +17,7 @@ process SMOOVE {
 					-duphold \
 					--genotype \
                     --name ${sample} \
-                    --exclude /data/references/bed/GRCh38/exclude.cnvnator_100bp.GRCh38.20170403.bed \
+                    --exclude ${params.exclude_bed} \
                     --fasta ${fasta} \
                     -p ${task.cpus} \
 					--outdir . \
@@ -79,7 +79,7 @@ process SMOOVE_JOINT_GENOTYPE {
 		path(bam)
 		path(bai)
 		path(fasta)
-		path(exclude_bed)
+		path(fasta_fai)
 	output:
 		tuple path("multisample-smoove.genotyped.vcf.gz"), path("multisample-smoove.genotyped.vcf.gz.tbi")
 	script:
@@ -87,7 +87,7 @@ process SMOOVE_JOINT_GENOTYPE {
             
 		smoove call -x \
 					--name multisample \
-					--exclude ${exclude_bed} \
+					--exclude ${params.exclude_bed} \
 					--fasta ${fasta} \
 					-p ${task.cpus} \
 					--genotype ${bam}

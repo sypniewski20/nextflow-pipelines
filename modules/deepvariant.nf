@@ -1,5 +1,3 @@
-fasta = file(params.fasta)
-
 process DEEP_VARIANT_WGS {
     tag "${sample}"
     label 'deepvariant'
@@ -20,8 +18,7 @@ process DEEP_VARIANT_WGS {
         --ref ${fasta} \
         --reads ${bam} \
 		--output_vcf ${sample}_deepvariant.vcf.gz \
-        --num_shards ${task.cpus} \
-		--regions ${contigs_bed}
+        --num_shards ${task.cpus} 
 
 		"""
 
@@ -47,8 +44,7 @@ process DEEP_VARIANT_WES {
         --ref ${fasta} \
         --reads ${bam} \
 		--output_vcf ${sample}_deepvariant.vcf.gz \
-        --num_shards ${task.cpus} \
-		--regions chr1 chr2 chr3 chr4 chr5 chr6 chr7 chr8 chr9 chr10 chr11 chr12 chr13 chr14 chr15 chr16 chr17 chr18 chr19 chr20 chr21 chr22 chrX
+        --num_shards ${task.cpus}
 
 		"""
 
@@ -63,7 +59,6 @@ process DEEP_VARIANT_WGS_GVCF {
 		tuple val(sample), path(bam), path(bai)
 		path(fasta)
 		path(fasta_fai)
-		path(contigs_bed)
 	output:
 		tuple val(sample), path("${sample}_deepvariant.g.vcf.gz")
 	script:
@@ -75,8 +70,7 @@ process DEEP_VARIANT_WGS_GVCF {
         --reads ${bam} \
         --output_gvcf ${sample}_deepvariant.g.vcf.gz \
 		--output_vcf ${sample}_deepvariant.vcf.gz \
-        --num_shards ${task.cpus} \
-		--regions ${contigs_bed}
+        --num_shards ${task.cpus} 
 
 		"""
 
@@ -91,7 +85,6 @@ process DEEP_VARIANT_WES_GVCF {
 		tuple val(sample), path(bam), path(bai)
 		path(fasta)
 		path(fasta_fai)
-		path(contigs_bed)
 	output:
 		tuple val(sample), path("${sample}_deepvariant.g.vcf.gz")
 	script:
@@ -103,8 +96,7 @@ process DEEP_VARIANT_WES_GVCF {
         --reads ${bam} \
         --output_gvcf ${sample}_deepvariant.g.vcf.gz \
 		--output_vcf ${sample}_deepvariant.vcf.gz \
-        --num_shards ${task.cpus} \
-		--regions ${contigs_bed}
+        --num_shards ${task.cpus} 
 
 		"""
 
@@ -150,7 +142,6 @@ process GLNEXUS_WES {
 		glnexus_cli \
 		--threads ${task.cpus} \
 		--config DeepVariantWES \
-		--bed "${params.contigs_bed}" \
 		${vcf} | \
 		bcftools view -Oz -o multisample_deepvariant.vcf.gz
 

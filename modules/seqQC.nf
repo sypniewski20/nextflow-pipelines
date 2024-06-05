@@ -89,7 +89,7 @@ process FASTP_PROCESSING {
 }
 
 process MOSDEPTH_WGS {
-	publishDir "${params.outfolder}/${params.runID}/BAMQC", mode: 'copy', overwrite: true
+	publishDir "${params.outfolder}/${params.runID}/BAMQC", pattern: "*mosdepth*", mode: 'copy', overwrite: true
 	tag "${sample}"
 	label 'gatk'
 	label 'mem_4GB'
@@ -102,6 +102,8 @@ process MOSDEPTH_WGS {
 		"""
 
 		mosdepth -n --fast-mode --by 500  ${sample} ${bam} --threshold 1,10,20,30 -t ${task.cpus}
+		python /mosdepth/plot-dist.py ${sample}.mosdepth.global.dist.txt
+		mv dist.html ${sample}_mosdepth.html
 
 		"""
 }
@@ -119,7 +121,9 @@ process MOSDEPTH_EXOME {
 	script:
 		"""
 
-		mosdepth --by ${params.contigs_bed} -n --fast-mode ${sample} ${bam} --threshold 1,10,20,30 -t ${task.cpus}
+		mosdepth -n --threshold 1,10,20,30 --by ${params.contigs_bed} --fast-mode ${sample} ${bam} -t ${task.cpus}
+		python /mosdepth/plot-dist.py ${sample}.mosdepth.region.dist.txt
+		mv dist.html ${sample}_mosdepth.html
 
 		"""
 }
