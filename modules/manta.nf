@@ -1,4 +1,5 @@
 process MANTA_GERMLINE {
+	publishDir "${params.outfolder}/${params.runID}/SV/manta", mode: 'copy', overwrite: true
 	tag "${sample}"
 	label 'manta'
 	label 'mem_8GB'
@@ -7,8 +8,6 @@ process MANTA_GERMLINE {
 		tuple val(sample), path(bam), path(bai)
 		path(fasta)
 		path(fasta_fai)
-		path(contigs_bed)
-		path(contigs_bed_tbi)
 	output:
 		tuple val(sample), path("manta/results/variants/diploidSV.vcf.gz")
 	script:
@@ -17,8 +16,7 @@ process MANTA_GERMLINE {
         /manta/bin/configManta.py \
 		--bam ${bam} \
 		--referenceFasta ${fasta} \
-		--runDir manta \
-		--callRegions ${contigs_bed}
+		--runDir manta 
 
 		manta/runWorkflow.py -j ${task.cpus}
 
@@ -26,6 +24,7 @@ process MANTA_GERMLINE {
 }
 
 process MANTA_EXOME_GERMLINE {
+	publishDir "${params.outfolder}/${params.runID}/SV/manta", mode: 'copy', overwrite: true
 	tag "${sample}"
 	label 'manta'
 	label 'mem_8GB'
@@ -34,8 +33,6 @@ process MANTA_EXOME_GERMLINE {
 		tuple val(sample), path(bam), path(bai)
 		path(fasta)
 		path(fasta_fai)
-		path(contigs_bed)
-		path(contigs_bed_tbi)
 	output:
 		tuple val(sample), path("manta/results/variants/diploidSV.vcf.gz")
 	script:
@@ -45,37 +42,37 @@ process MANTA_EXOME_GERMLINE {
 		--bam ${bam} \
 		--referenceFasta ${fasta} \
 		--runDir manta \
-		--exome \
-		--callRegions ${contigs_bed}
+		--exome 
 
-		manta/runWorkflow.py -j ${task.cpus}
+		./manta/runWorkflow.py -j ${task.cpus}
 
 		"""
 }
 
 process MANTA_WES_JOINT {
-	publishDir "${params.outfolder}/${params.runID}/SV/manta", mode: 'copy', overwrite: true
+	publishDir "${params.outfolder}/${params.runID}/SV", mode: 'copy', overwrite: true
 	label 'manta'
 	label 'mem_8GB'
 	label 'core_18'
 	input:
 		path(bam)
+		path(bai)
 		path(fasta)
 		path(fasta_fai)
-		path(contigs_bed)
 	output:
 		path("manta/results/variants/diploidSV.vcf.gz")
 	script:
 		"""
-            
+
+		BAM=\$( for i in \$( ls *.bam ); do echo "--bam \$i"; done )
+
         /manta/bin/configManta.py \
-		--bam ${bam} \
 		--referenceFasta ${fasta} \
 		--runDir manta \
 		--exome \
-		--callRegions ${contigs_bed}
+		\$( echo \$BAM )
 
-		/manta/runWorkflow.py -j ${task.cpus}
+		./manta/runWorkflow.py -j ${task.cpus}
 
 		"""
 }
@@ -87,21 +84,22 @@ process MANTA_WGS_JOINT {
 	label 'core_18'
 	input:
 		path(bam)
+		path(bai)
 		path(fasta)
 		path(fasta_fai)
-		path(contigs_bed)
 	output:
 		path("manta/results/variants/diploidSV.vcf.gz")
 	script:
 		"""
             
+		BAM=\$( for i in \$( ls *.bam ); do echo "--bam \$i"; done )
+
         /manta/bin/configManta.py \
-		--bam ${bam} \
 		--referenceFasta ${fasta} \
 		--runDir manta \
-		--callRegions ${contigs_bed}
+		\$BAM
 
-		manta/runWorkflow.py -j ${task.cpus}
+		./manta/runWorkflow.py -j ${task.cpus}
 
 		"""
 }
@@ -115,14 +113,14 @@ process MANTA_FILTER_VCF {
 	input:
 		tuple val(sample), path(manta)
 	output:
-		tuple path("${sample}_manta_cnv_sorted.vcf.gz"), path("${sample}_manta_cnv_sorted.vcf.gz.tbi")
+		tuple path("${sample}_manta_sorted.vcf.gz"), path("${sample}_manta_sorted.vcf.gz.tbi")
 	script:
 		"""
             
 		bcftools view -f PASS --threads ${task.cpus} ${manta} -Ou | \
-		bcftools sort -Oz -o ${sample}_manta_cnv_sorted.vcf.gz
+		bcftools sort -Oz -o ${sample}_manta_sorted.vcf.gz
 
-		tabix -p vcf ${sample}_manta_cnv_sorted.vcf.gz
+		tabix -p vcf ${sample}_manta_sorted.vcf.gz
 
 		"""
 }

@@ -21,21 +21,20 @@ process GET_MT {
 
 process MT_CALL {
     publishDir "${params.outfolder}/${params.runID}/SNV/mity", mode: 'copy', overwrite: true
+    tag "${sample}"
     label 'mity'
 	label 'mem_16GB'
 	label 'core_1'
 	input:
-		path(bam)
-		path(bai)
+		tuple val(sample), path(bam), path(bai)
 	output:
-		path("mity.vcf.gz")
+		tuple path("${sample}.mity.call.vcf.gz"), path("${sample}.mity.call.vcf.gz.tbi")
 	script:
 		"""
 
-        call \
-        --prefix mity \
-        --output-dir . \
-        --normalise \
+        mity call \
+		--normalise \
+        --prefix ${sample} \
 		--reference ${params.mity_genome} \
         ${bam}
 
@@ -45,20 +44,20 @@ process MT_CALL {
 
 process MT_REPORT {
     publishDir "${params.outfolder}/${params.runID}/SNV/mity", mode: 'copy', overwrite: true
+    tag "${sample}"
     label 'mity'
 	label 'mem_16GB'
 	label 'core_1'
 	input:
 		path(vcf)
 	output:
-		tuple path("mity.annotated_variants.csv"), path("mity.annotated_variants.xlsx")
+		tuple path("${sample}.annotated_variants.csv"), path("${sample}.annotated_variants.xlsx")
 	script:
 		"""
 
-        report \
-        --prefix mity \
+        mity report \
+        --prefix ${sample} \
         --min_vaf 0.01 \
-        --output-dir . \
         ${vcf}
 
 		"""
@@ -66,7 +65,8 @@ process MT_REPORT {
 }
 
 process MT_MERGE {
-    publishDir "${params.outfolder}/${params.runID}/SNV/", mode: 'copy', overwrite: true
+    publishDir "${params.outfolder}/${params.runID}/SNV/mity", mode: 'copy', overwrite: true
+    tag "${sample}"
     label 'mity'
 	label 'mem_16GB'
 	label 'core_1'
@@ -74,12 +74,12 @@ process MT_MERGE {
 		path(mity_vcf)
 		path(nuclear_vcf)
 	output:
-		tuple path("mity.annotated_variants.csv"), path("mity.annotated_variants.xlsx")
+		tuple path("${sample}.annotated_variants.csv"), path("${sample}.annotated_variants.xlsx")
 	script:
 		"""
 
-		merge \
-		--prefix multisample \
+		mity merge \
+		--prefix ${sample} \
 		--mity_vcf ${mity_vcf} \
 		--nuclear_vcf ${nuclear_vcf}
 

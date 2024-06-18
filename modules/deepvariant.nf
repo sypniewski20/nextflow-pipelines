@@ -7,7 +7,6 @@ process DEEP_VARIANT_WGS {
 		tuple val(sample), path(bam), path(bai)
 		path(fasta)
 		path(fasta_fai)
-		path(contigs_bed)
 	output:
 		tuple val(sample), path("${sample}_deepvariant.vcf.gz")
 	script:
@@ -18,8 +17,11 @@ process DEEP_VARIANT_WGS {
         --ref ${fasta} \
         --reads ${bam} \
 		--output_vcf ${sample}_deepvariant.vcf.gz \
-        --num_shards ${task.cpus} 
-
+        --num_shards ${task.cpus} \
+		--haploid_contigs "${params.haploid_contigs}" \
+		--par_regions_bed "${params.par_regions_bed}" \
+		--regions "chr1 chr2 chr3 chr4 chr5 chr6 chr7 chr8 chr9 chr10 chr11 chr12 chr13 chr14 chr15 chr16 chr17 chr18 chr19 chr20 chr21 chr22 chrX chrY"
+		
 		"""
 
 }
@@ -33,7 +35,6 @@ process DEEP_VARIANT_WES {
 		tuple val(sample), path(bam), path(bai)
 		path(fasta)
 		path(fasta_fai)
-		path(contigs_bed)
 	output:
 		tuple val(sample), path("${sample}_deepvariant.vcf.gz")
 	script:
@@ -44,7 +45,8 @@ process DEEP_VARIANT_WES {
         --ref ${fasta} \
         --reads ${bam} \
 		--output_vcf ${sample}_deepvariant.vcf.gz \
-        --num_shards ${task.cpus}
+        --num_shards ${task.cpus} \
+		--regions "chr1 chr2 chr3 chr4 chr5 chr6 chr7 chr8 chr9 chr10 chr11 chr12 chr13 chr14 chr15 chr16 chr17 chr18 chr19 chr20 chr21 chr22 chrX chrY"
 
 		"""
 
@@ -70,7 +72,8 @@ process DEEP_VARIANT_WGS_GVCF {
         --reads ${bam} \
         --output_gvcf ${sample}_deepvariant.g.vcf.gz \
 		--output_vcf ${sample}_deepvariant.vcf.gz \
-        --num_shards ${task.cpus} 
+        --num_shards ${task.cpus} \
+		--regions "chr1 chr2 chr3 chr4 chr5 chr6 chr7 chr8 chr9 chr10 chr11 chr12 chr13 chr14 chr15 chr16 chr17 chr18 chr19 chr20 chr21 chr22 chrX chrY"
 
 		"""
 
@@ -96,7 +99,8 @@ process DEEP_VARIANT_WES_GVCF {
         --reads ${bam} \
         --output_gvcf ${sample}_deepvariant.g.vcf.gz \
 		--output_vcf ${sample}_deepvariant.vcf.gz \
-        --num_shards ${task.cpus} 
+        --num_shards ${task.cpus} \
+		--regions "chr1 chr2 chr3 chr4 chr5 chr6 chr7 chr8 chr9 chr10 chr11 chr12 chr13 chr14 chr15 chr16 chr17 chr18 chr19 chr20 chr21 chr22 chrX chrY"
 
 		"""
 

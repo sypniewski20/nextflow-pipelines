@@ -1,3 +1,4 @@
+*.sh
 .nextflow 
 .nextflow.log 
 .nextflow.log.1 

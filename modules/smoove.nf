@@ -9,7 +9,35 @@ process SMOOVE {
 		path(fasta)
 		path(fasta_fai)
 	output:
-		tuple val(sample), path("${sample}-smoove.genotyped.vcf.gz"), path("${sample}-smoove.genotyped.vcf.gz.csi")
+		tuple val(sample), path("${sample}-smoove.genotyped.bcf"), path("${sample}-smoove.genotyped.bcf.csi")
+	script:
+		"""
+            
+        smoove call -x \
+					-duphold \
+					--genotype \
+                    --name ${sample} \
+                    --exclude ${params.exclude_bed} \
+                    --fasta ${fasta} \
+                    -p ${task.cpus} \
+					--outdir . \
+					${bam}
+
+		"""
+}
+
+process SMOOVE_JOINT {
+	publishDir "${params.outfolder}/${params.runID}/SV/smoove", mode: 'copy', overwrite: true
+	label 'smoove'
+	label 'mem_16GB'
+	label 'core_8'
+	input:
+		path(bam), 
+		path(bai),
+		path(fasta)
+		path(fasta_fai)
+	output:
+		tuple path("multisample-smoove.genotyped.bcf"), path("multisample-smoove.genotyped.bcf.csi")
 	script:
 		"""
             
@@ -81,7 +109,8 @@ process SMOOVE_JOINT_GENOTYPE {
 		path(fasta)
 		path(fasta_fai)
 	output:
-		tuple path("multisample-smoove.genotyped.vcf.gz"), path("multisample-smoove.genotyped.vcf.gz.tbi")
+		tuple val(sample), path("multisample-smoove.genotyped.vcf.gz"), emit: vcf
+		tuple val(sample), path("multisample-smoove.genotyped.vcf.gz.tbi"), emit: tbi
 	script:
 		"""
             

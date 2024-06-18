@@ -2,7 +2,7 @@ process BWA_MAP_READS {
 	publishDir "${params.outfolder}/${params.runID}/BAM", mode: 'copy', overwrite: true
 	tag "${sample}"
 	label 'gatk'
-	label 'mem_96GB'
+	label 'mem_64GB'
 	label 'core_24'
 	input:
 		tuple val(sample), path(read_1), path(read_2)
@@ -45,7 +45,7 @@ process BWAMEM2_MAP_READS {
 	publishDir "${params.outfolder}/${params.runID}/BAM", mode: 'copy', overwrite: true
 	tag "${sample}"
 	label 'gatk'
-	label 'mem_96GB'
+	label 'mem_64GB'
 	label 'core_24'
 	input:
 		tuple val(sample), path(read_1), path(read_2)
