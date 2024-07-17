@@ -35,9 +35,6 @@ process BWA_MAP_READS {
 
 		sambamba index --nthreads ${task.cpus} ${sample}_markdups.bam
 
-		gatk ValidateSamFile -I  ${sample}_markdups.bam \
-							 -MODE	SUMMARY
-
 		"""
 }
 
@@ -75,9 +72,6 @@ process BWAMEM2_MAP_READS {
 					  -o ${sample}_markdups.bam
 
 		sambamba index --nthreads ${task.cpus} ${sample}_markdups.bam
-
-		gatk ValidateSamFile -I  ${sample}_markdups.bam \
-							 -MODE	SUMMARY
 
 		"""
 }

@@ -24,7 +24,7 @@ Exclude BED:			            ${params.exclude_bed}
 
 include { Read_bam_checkpoint } from '../modules/functions.nf'
 include { MANTA_GERMLINE; MANTA_EXOME_GERMLINE; MANTA_WGS_JOINT; MANTA_WES_JOINT; MANTA_FILTER_VCF } from "../modules/manta.nf"
-include { SMOOVE; SMOOVE_JOINT; SMOOVE_ANNOTATE } from "../modules/smoove.nf"
+include { SMOOVE; SMOOVE_JOINT; SMOOVE_ANNOTATE; SMOOVE_FILTER_VCF } from "../modules/smoove.nf"
 include { DELLY_SV_CALL; DELLY_CNV_CALL } from "../modules/delly.nf"
 include { GRIDSS; GRIDSS_JOINT; VIRUS_BREAKEND; GRIDSS_FILTER_VCF } from "../modules/gridss.nf"
 include { VEP_SV; ANNOT_SV; SURVIVOR } from "../modules/annotations.nf"
@@ -90,6 +90,7 @@ workflow manta {
 		}	
 
 		MANTA_FILTER_VCF(manta_out) | set { manta_sv }
+		VEP_SV(manta_sv, fasta, fasta_fai)
 
 	emit:
 		manta_sv
@@ -128,19 +129,21 @@ workflow smoove {
 				  .collect()
 				  .set{ joint_bai }
 
-			SMOOVE_JOINT(ch_bam, fasta, fasta_fai) 
+			SMOOVE_JOINT(joint_bam, 
+				   joint_bai,
+				   fasta, 
+				   fasta_fai) | set { smoove_output }
 
 		} else {
 
-			SMOOVE(joint_bam, 
-				   joint_bai,
-				   fasta, 
-				   fasta_fai) 
+			SMOOVE(ch_bam, fasta, fasta_fai)  | set { smoove_output }
 
 		}
 
-		SMOOVE(ch_bam, fasta, fasta_fai) 
-		SMOOVE.out.vcf | set { smoove_sv }
+		SMOOVE_FILTER_VCF(smoove_output) | set { smoove_sv }
+
+		VEP_SV(smoove_sv, fasta, fasta_fai)
+
 	emit:
 		smoove_sv
 }
@@ -194,11 +197,13 @@ workflow gridss {
 
 		GRIDSS_FILTER_VCF(gridss_output)
 
+		VEP_SV(GRIDSS_FILTER_VCF.out, fasta, fasta_fai)
+
 		if (params.virusbreakend == true) {
-			VIRUS_BREAKEND(gridss_output)
+			VIRUS_BREAKEND(ch_bam, 
+						   fasta,
+						   fasta_fai)
 		}
-	// emit:
-	// 	gridss_sv
 }
 
 workflow survivor {

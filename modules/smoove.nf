@@ -9,7 +9,7 @@ process SMOOVE {
 		path(fasta)
 		path(fasta_fai)
 	output:
-		tuple val(sample), path("${sample}-smoove.genotyped.bcf"), path("${sample}-smoove.genotyped.bcf.csi")
+		tuple val(sample), path("${sample}-smoove.genotyped.vcf.gz"), path("${sample}-smoove.genotyped.vcf.gz.csi")
 	script:
 		"""
             
@@ -37,7 +37,7 @@ process SMOOVE_JOINT {
 		path(fasta)
 		path(fasta_fai)
 	output:
-		tuple path("multisample-smoove.genotyped.bcf"), path("multisample-smoove.genotyped.bcf.csi")
+		tuple path("multisample-smoove.genotyped.vcf.gz"), path("multisample-smoove.genotyped.vcf.gz.csi")
 	script:
 		"""
             
@@ -123,6 +123,28 @@ process SMOOVE_JOINT_GENOTYPE {
 
 		tabix -p vcf multisample-smoove.genotyped.vcf.gz
 
+
+		"""
+}
+
+
+process SMOOVE_FILTER_VCF {
+	publishDir "${params.outfolder}/${params.runID}/SV/smoove", mode: 'copy', overwrite: true
+	tag "${sample}"
+	label 'gatk'
+	label 'mem_8GB'
+	label 'core_4'
+	input:
+		tuple val(sample), path(vcf), path(tbi)
+	output:
+		tuple val(sample), path("${sample}_smoove_sorted.vcf.gz"), path("${sample}_smoove_sorted.vcf.gz.tbi")
+	script:
+		"""
+            
+		bcftools view -f PASS --threads ${task.cpus} ${vcf} -Ou | \
+		bcftools sort -Oz -o ${sample}_smoove_sorted.vcf.gz
+
+		tabix -p vcf ${sample}_smoove_sorted.vcf.gz
 
 		"""
 }

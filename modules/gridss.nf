@@ -66,13 +66,16 @@ process VIRUS_BREAKEND {
 	label 'mem_64GB'
 	label 'core_4'
 	input:
-		tuple val(sample), path(bam)
+		tuple val(sample), path(bam), path(bai)
+		path(fasta)
+		path(fasta_fai)
 	output:
 		tuple val(sample), path("${sample}_virusbreakend.vcf")
 	script:
 		"""
 
         virusbreakend \
+		-r ${fasta} \
         -t ${task.cpus} \
         -o ${sample}_virusbreakend.vcf \
         --db ${params.virusbreakend_db} \
@@ -90,12 +93,12 @@ process GRIDSS_FILTER_VCF {
 	input:
 		tuple val(sample), path(vcf)
 	output:
-		tuple val(sample), path("${vcf}_pass.gz"), path("${vcf}_pass.gz.tbi")
+		tuple val(sample), path("${vcf}_pass.vcf.gz"), path("${vcf}_pass.vcf.gz.tbi")
 	script:
 		"""
 
-		bcftools view -f 'PASS' ${vcf} -Oz -o ${vcf}_pass.gz
-        tabix -p ${vcf}_pass.gz
+		bcftools view -f 'PASS' ${vcf} -Oz -o ${vcf}_pass.vcf.gz
+        tabix -p vcf ${vcf}_pass.vcf.gz
 
 		"""
 }

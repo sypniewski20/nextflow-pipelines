@@ -6,6 +6,7 @@ println """\
 =================================================================================================================
 Run ID              :${params.runID}
 Output				:${params.outfolder}/${params.runID}
+Call MT				:${params.mity}
 =================================================================================================================	
 										References
 =================================================================================================================
@@ -46,18 +47,25 @@ workflow deepvariant {
 							fasta_fai)
 			FILTER_SNVS(DEEP_VARIANT_WES.out, fasta)
 		}
-		MT_CALL(ch_bam)
-		MT_REPORT(MT_CALL.out)
-		MT_MERGE(MT_CALL.out, FILTER_SNVS.out)
 
-		VEP_SNV(MT_MERGE.out, fasta, fasta_fai)
+		VEP_SNV(FILTER_SNVS.out, fasta, fasta_fai)
+
+		if (params.mity == true) {
+			MT_CALL(ch_bam)
+			MT_REPORT(MT_CALL.out)
+			MT_MERGE(MT_CALL.out, FILTER_SNVS.out)
+
+			VEP_SNV(MT_MERGE.out, fasta, fasta_fai)
+
+		}
+
 }
 
 //Main workflow
 
 workflow {
 	main:
-		read_bam(params.bam_samplesheet) | set { ch_bam }
+		read_bam(params.samplesheet) | set { ch_bam }
 
 		deepvariant(read_bam.out.ch_bam, 
 					params.fasta)
